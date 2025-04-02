@@ -3,6 +3,8 @@ import logging
 import datetime
 import random
 import threading
+import time
+import queue
 from app import db, app
 from models import Document, TextChunk, VectorEmbedding, ProcessingQueue
 from utils.pdf_processor import extract_text_from_pdf, chunk_text
@@ -12,16 +14,77 @@ from utils.citation_generator import generate_apa_citation
 
 logger = logging.getLogger(__name__)
 
+# Global queue for document processing
+document_queue = queue.Queue()
+# Global flag to track if processor is running
+processor_running = False
+# Lock for thread safety
+processor_lock = threading.Lock()
+
 def process_document_job(document_id):
-    """Process a document in a separate thread with proper application context"""
-    def process_with_app_context(doc_id):
-        with app.app_context():
-            process_document(doc_id)
+    """Add document to processing queue"""
+    logger.info(f"Adding document {document_id} to processing queue")
+    document_queue.put(document_id)
     
-    thread = threading.Thread(target=process_with_app_context, args=(document_id,))
-    thread.daemon = True
-    thread.start()
-    return thread
+    # Start the background processor if not already running
+    start_background_processor()
+    return True
+
+def start_background_processor():
+    """Start the background document processor if not already running"""
+    global processor_running
+    
+    with processor_lock:
+        if not processor_running:
+            logger.info("Starting background document processor")
+            processor_thread = threading.Thread(target=background_processor)
+            processor_thread.daemon = True
+            processor_thread.start()
+            processor_running = True
+
+def background_processor():
+    """Background thread to process documents from the queue"""
+    global processor_running
+    
+    logger.info("Background processor started")
+    
+    try:
+        while True:
+            try:
+                # Try to get a document ID from the queue with timeout
+                # This allows the thread to check for any shutdown signals
+                try:
+                    document_id = document_queue.get(timeout=5)
+                except queue.Empty:
+                    # No documents in queue, check for pending ones in database
+                    with app.app_context():
+                        pending_queue = ProcessingQueue.query.filter_by(status='pending').all()
+                        if pending_queue:
+                            for entry in pending_queue:
+                                document_queue.put(entry.document_id)
+                            continue
+                    # If no documents in queue or database, just continue the loop
+                    continue
+                
+                logger.info(f"Processing document {document_id} from queue")
+                
+                # Process document with app context
+                with app.app_context():
+                    process_document(document_id)
+                
+                # Mark task as complete
+                document_queue.task_done()
+                
+            except Exception as e:
+                logger.exception(f"Error in background processor: {str(e)}")
+                # Sleep briefly to avoid overwhelming the system in case of repeated errors
+                time.sleep(1)
+    
+    finally:
+        # Make sure to reset the running flag when the thread exits
+        with processor_lock:
+            processor_running = False
+        logger.info("Background processor stopped")
 
 def process_document(document_id):
     """Process a document's content, extract metadata, and generate embeddings"""

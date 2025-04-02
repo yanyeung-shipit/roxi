@@ -49,3 +49,8 @@ with app.app_context():
     import models
     db.create_all()
     logger.info("Database tables created")
+    
+    # Start background document processor
+    from utils.document_processor import start_background_processor
+    start_background_processor()
+    logger.info("Background document processor started")

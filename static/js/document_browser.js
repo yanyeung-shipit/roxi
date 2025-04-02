@@ -57,9 +57,13 @@ function initDocumentBrowser() {
         }
         
         // Fetch documents
-        fetch(`/api/documents?${params.toString()}`)
+        fetch(`/documents/api/documents?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load documents');
+                }
+                
                 // Store data
                 documents = data.documents;
                 totalPages = data.pages;
@@ -178,9 +182,12 @@ function initDocumentBrowser() {
      * Load all available tags
      */
     function loadTags() {
-        fetch('/api/tags')
+        fetch('/documents/api/tags')
             .then(response => response.json())
             .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load tags');
+                }
                 renderTags(data.tags);
             })
             .catch(error => {
@@ -280,9 +287,14 @@ function initDocumentBrowser() {
         `;
         
         // Fetch document details
-        fetch(`/api/documents/${documentId}`)
+        fetch(`/documents/api/documents/${documentId}`)
             .then(response => response.json())
-            .then(doc => {
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load document details');
+                }
+                
+                const doc = data;
                 // Format tags
                 const tags = doc.tags ? doc.tags.map(tag => 
                     `<span class="badge bg-secondary tag-badge me-1">${escapeHtml(tag)}</span>`

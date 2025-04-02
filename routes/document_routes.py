@@ -16,62 +16,71 @@ def list_documents():
     """
     API endpoint to list documents with pagination and filtering
     """
-    # Get pagination parameters
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
-    
-    # Get filter parameters
-    search = request.args.get('search', '')
-    tag = request.args.get('tag', '')
-    
-    # Build the query
-    query = Document.query
-    
-    # Apply filters if provided
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            sa.or_(
-                Document.title.ilike(search_term),
-                Document.authors.ilike(search_term),
-                Document.journal.ilike(search_term),
-                Document.doi.ilike(search_term)
+    try:
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Get filter parameters
+        search = request.args.get('search', '')
+        tag = request.args.get('tag', '')
+        
+        # Build the query
+        query = Document.query
+        
+        # Apply filters if provided
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                sa.or_(
+                    Document.title.ilike(search_term),
+                    Document.authors.ilike(search_term),
+                    Document.journal.ilike(search_term),
+                    Document.doi.ilike(search_term)
+                )
             )
-        )
-    
-    if tag:
-        query = query.filter(Document.tags.contains([tag]))
-    
-    # Order by upload date (newest first)
-    query = query.order_by(Document.upload_date.desc())
-    
-    # Paginate results
-    paginated = query.paginate(page=page, per_page=per_page)
-    
-    # Format the response
-    documents = []
-    for doc in paginated.items:
-        documents.append({
-            'id': doc.id,
-            'title': doc.title or 'Untitled Document',
-            'authors': doc.authors,
-            'journal': doc.journal,
-            'doi': doc.doi,
-            'publication_date': doc.publication_date.isoformat() if doc.publication_date else None,
-            'upload_date': doc.upload_date.isoformat(),
-            'processed': doc.processed,
-            'tags': doc.tags
+        
+        if tag:
+            query = query.filter(Document.tags.contains([tag]))
+        
+        # Order by upload date (newest first)
+        query = query.order_by(Document.upload_date.desc())
+        
+        # Paginate results
+        paginated = query.paginate(page=page, per_page=per_page)
+        
+        # Format the response
+        documents = []
+        for doc in paginated.items:
+            documents.append({
+                'id': doc.id,
+                'title': doc.title or 'Untitled Document',
+                'authors': doc.authors,
+                'journal': doc.journal,
+                'doi': doc.doi,
+                'publication_date': doc.publication_date.isoformat() if doc.publication_date else None,
+                'upload_date': doc.upload_date.isoformat(),
+                'processed': doc.processed,
+                'tags': doc.tags
+            })
+        
+        return jsonify({
+            'success': True,
+            'total': paginated.total,
+            'pages': paginated.pages,
+            'current_page': page,
+            'per_page': per_page,
+            'has_next': paginated.has_next,
+            'has_prev': paginated.has_prev,
+            'documents': documents
         })
-    
-    return jsonify({
-        'total': paginated.total,
-        'pages': paginated.pages,
-        'current_page': page,
-        'per_page': per_page,
-        'has_next': paginated.has_next,
-        'has_prev': paginated.has_prev,
-        'documents': documents
-    })
+    except Exception as e:
+        import logging
+        logging.exception(f"Error in list_documents: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to retrieve documents: {str(e)}"
+        }), 500
 
 @document_routes.route('/api/tags')
 def get_tags():
@@ -110,27 +119,42 @@ def get_document(document_id):
     """
     API endpoint to get a single document by ID
     """
-    document = Document.query.get_or_404(document_id)
-    
-    # Get processing status
-    processing_status = None
-    queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).first()
-    if queue_entry:
-        processing_status = queue_entry.status
-    
-    # Format the response
-    doc_data = {
-        'id': document.id,
-        'title': document.title or 'Untitled Document',
-        'authors': document.authors,
-        'journal': document.journal,
-        'doi': document.doi,
-        'publication_date': document.publication_date.isoformat() if document.publication_date else None,
-        'upload_date': document.upload_date.isoformat(),
-        'processed': document.processed,
-        'tags': document.tags,
-        'citation_apa': document.citation_apa,
-        'processing_status': processing_status
-    }
-    
-    return jsonify(doc_data)
+    try:
+        document = Document.query.get(document_id)
+        
+        if not document:
+            return jsonify({
+                'success': False,
+                'error': f'Document with ID {document_id} not found'
+            }), 404
+        
+        # Get processing status
+        processing_status = None
+        queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).first()
+        if queue_entry:
+            processing_status = queue_entry.status
+        
+        # Format the response
+        doc_data = {
+            'success': True,
+            'id': document.id,
+            'title': document.title or 'Untitled Document',
+            'authors': document.authors,
+            'journal': document.journal,
+            'doi': document.doi,
+            'publication_date': document.publication_date.isoformat() if document.publication_date else None,
+            'upload_date': document.upload_date.isoformat(),
+            'processed': document.processed,
+            'tags': document.tags,
+            'citation_apa': document.citation_apa,
+            'processing_status': processing_status
+        }
+        
+        return jsonify(doc_data)
+    except Exception as e:
+        import logging
+        logging.exception(f"Error in get_document: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to retrieve document: {str(e)}"
+        }), 500
