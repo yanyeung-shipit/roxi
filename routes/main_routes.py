@@ -143,6 +143,7 @@ def query():
                     doc.id,
                     chunk.id
                 )
+                # Keep the full APA citation as "citation" and add other fields for flexibility
                 citation['title'] = doc.title
                 citation['authors'] = doc.authors
                 citation['journal'] = doc.journal

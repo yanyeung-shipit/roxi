@@ -102,6 +102,11 @@
     font-weight: bold;
 }
 
+.citation-text {
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
 /* File upload area */
 .custom-file-upload {
     position: relative;

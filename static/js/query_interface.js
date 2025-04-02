@@ -247,12 +247,7 @@ function addMessageToConversation(role, message, citations = []) {
             const citationList = citations.map((citation, index) => {
                 return `
                     <div class="citation-details mt-2">
-                        <div class="citation-title">${citation.title || 'Untitled Document'}</div>
-                        <div class="citation-authors">${citation.authors || 'Unknown Authors'}</div>
-                        <div class="citation-source">
-                            ${citation.journal ? citation.journal + ' - ' : ''}
-                            ${citation.doi ? `DOI: <a href="https://doi.org/${citation.doi}" target="_blank">${citation.doi}</a>` : ''}
-                        </div>
+                        <div class="citation-text">${citation.citation || 'Citation not available'}</div>
                         <div class="citation-snippet mt-1">
                             <small class="text-muted">"${citation.snippet || '...'}"</small>
                         </div>
