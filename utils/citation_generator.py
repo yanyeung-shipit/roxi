@@ -20,9 +20,36 @@ def generate_apa_citation(document):
         publication_date = document.publication_date
         doi = document.doi
         
+        # Check if we need to extract metadata from title
+        # For example, if title is just a filename like "eular_2023_ra_guidelines"
+        if (not doi or not journal) and title and "_" in title and not " " in title:
+            # Title might be just a filename
+            # Try to extract DOI from full_text if available
+            if document.full_text:
+                import re
+                # Look for DOI in first 1000 characters of text (usually contains citation info)
+                text_sample = document.full_text[:1000]
+                doi_match = re.search(r'doi:?\s*(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)', text_sample, re.IGNORECASE)
+                if doi_match and not document.doi:
+                    document.doi = doi_match.group(1)
+                    doi = document.doi
+                
+                # Try to extract a better title
+                # Look for paper title in first part of document
+                title_match = re.search(r'(?:Title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text_sample)
+                if title_match:
+                    document.title = title_match.group(1).strip()
+                    title = document.title
+                
+                # Try to extract better authors list
+                # Common author pattern at beginning of papers
+                author_match = re.search(r'((?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+(?:,|;|\s+and|\s+&)\s+)+(?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+))', text_sample)
+                if author_match:
+                    document.authors = author_match.group(1).strip()
+                    authors = document.authors
+        
         # Format authors (Last name, First initial)
         # This is a simplified approach - a real implementation would parse names properly
-        author_list = authors.split(',')
         formatted_authors = authors
         
         # Format publication year

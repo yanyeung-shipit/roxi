@@ -5,8 +5,11 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Regular expression for DOI pattern
+# Format: 10.NNNN/any_characters_here
 DOI_REGEX = r'(10\.\d{4,9}/[-._;()/:A-Z0-9]+)'
 DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
+# Format with 'doi:' prefix
+DOI_WITH_PREFIX_REGEX = r'doi:?\s*(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
 
 def extract_doi_from_text(text):
     """
@@ -21,7 +24,12 @@ def extract_doi_from_text(text):
     if not text:
         return None
     
-    # Try to find DOI with exact case first (more strict)
+    # Try to find DOI with 'doi:' prefix first (common in academic papers)
+    match = re.search(DOI_WITH_PREFIX_REGEX, text, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    
+    # Try to find DOI with exact case (more strict)
     match = re.search(DOI_REGEX, text, re.IGNORECASE)
     if match:
         return match.group(1)

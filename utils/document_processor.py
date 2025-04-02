@@ -9,7 +9,7 @@ from app import db, app
 from models import Document, TextChunk, VectorEmbedding, ProcessingQueue
 from utils.pdf_processor import extract_text_from_pdf, chunk_text
 from utils.embeddings import generate_embeddings
-from utils.doi_validator import extract_and_validate_doi
+from utils.doi_validator import extract_and_validate_doi, validate_doi_with_crossref
 from utils.citation_generator import generate_apa_citation
 
 logger = logging.getLogger(__name__)
@@ -120,11 +120,61 @@ def process_document(document_id):
         # Store the full text in the document
         document.full_text = text
         
-        # Try to extract and validate DOI
-        metadata = extract_and_validate_doi(text)
+        # Try to extract raw doi from text
+        import re
+        doi = None
+        # Look for DOI in first 1000 characters (usually contains citation info)
+        text_sample = text[:1000]
+        
+        # Try to extract DOI directly from text first
+        doi_match = re.search(r'doi:?\s*(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)', text_sample, re.IGNORECASE)
+        if doi_match:
+            doi = doi_match.group(1)
+            document.doi = doi
+        
+        # If we have a DOI, try to validate with Crossref and get more metadata
+        metadata = None
+        if doi:
+            metadata = validate_doi_with_crossref(doi)
+        else:
+            # Otherwise try the standard extraction method
+            metadata = extract_and_validate_doi(text)
+        
+        # If we can't get metadata from CrossRef, try direct extraction from text
+        if not metadata:
+            logger.info(f"Couldn't get metadata from CrossRef for document {document_id}, trying direct extraction")
+            
+            # Try to extract title directly
+            if document.title and "_" in document.title and not " " in document.title:
+                # Looks like a filename, try to find a better title
+                title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text_sample)
+                if not title_match:
+                    # Try alternative patterns
+                    title_match = re.search(r'EULAR recommendations for (.+?)(?:\n|\.)', text_sample)
+                if title_match:
+                    document.title = title_match.group(1).strip()
+            
+            # Try to extract authors
+            author_match = re.search(r'((?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+(?:,|;|\s+and|\s+&)\s+)+(?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+))', text_sample)
+            if author_match and not document.authors:
+                document.authors = author_match.group(1).strip()
+            
+            # Try to extract journal
+            journal_match = re.search(r'(?:journal|JOURNAL):?\s*([^\.]+?)(?:\n|\.)', text_sample)
+            if not journal_match:
+                # Common journal abbreviations
+                journal_match = re.search(r'(?:Ann(?:als)?\.?\s+(?:of\s+)?Rheum(?:atic)?\s+Dis(?:eases)?|Arthritis\s+Rheum(?:atology)?|J(?:ournal)?\s+Rheumatol(?:ogy)?)', text_sample)
+            if journal_match and not document.journal:
+                document.journal = journal_match.group(0).strip()
+            
+            # Try to extract year
+            year_match = re.search(r'\((\d{4})\)', text_sample)
+            if year_match and not document.publication_date:
+                year = int(year_match.group(1))
+                document.publication_date = datetime.datetime(year, 1, 1)
         
         # Update document metadata if DOI validation succeeded
-        if metadata:
+        elif metadata:
             # Update document with metadata from Crossref or other source
             document.doi = metadata.get('DOI')
             
@@ -239,49 +289,106 @@ def process_document(document_id):
 
 def generate_tags_from_content(text):
     """Generate tags from document content using NLP techniques"""
-    # This is a placeholder for demo purposes
-    # In a real system, you would use NLP to extract keywords
+    # This is a specialized tag generator for rheumatology documents
+    # It looks for specific terms relevant to rheumatology research
     
-    # Some common academic fields
-    fields = [
-        "Rheumatology", "Arthritis", "Inflammation", "Autoimmune", 
-        "Lupus", "Scleroderma", "Osteoarthritis", "Gout", "Fibromyalgia",
-        "Medicine", "Immunology", "Orthopedics", "Radiology", "Clinical Trials",
-        "Patient Care", "Treatment", "Therapy", "Biologics", "Diagnostics"
-    ]
+    # Common rheumatology disease categories
+    diseases = {
+        "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-", "seropositive arthritis"],
+        "Systemic Lupus Erythematosus": ["systemic lupus", "sle ", "sle,", "sle.", "sle)", "lupus nephritis", "lupus erythematosus"],
+        "Psoriatic Arthritis": ["psoriatic arthritis", "psa ", "psa,", "psa.", "psa)"],
+        "Ankylosing Spondylitis": ["ankylosing spondylitis", "as ", "as,", "as.", "as)", "axial spondyloarthritis"],
+        "Osteoarthritis": ["osteoarthritis", "oa ", "oa,", "oa.", "oa)", "degenerative joint disease"],
+        "Gout": ["gout", "gouty arthritis", "crystal arthropathy", "uric acid"],
+        "Systemic Sclerosis": ["systemic sclerosis", "scleroderma", "sclerosis"],
+        "Vasculitis": ["vasculitis", "anca", "giant cell arteritis", "takayasu", "polyarteritis"],
+        "Sjögren's Syndrome": ["sjögren", "sjogren", "sicca syndrome"],
+        "Polymyalgia Rheumatica": ["polymyalgia rheumatica", "pmr ", "pmr,", "pmr.", "pmr)"],
+        "Polymyositis": ["polymyositis", "dermatomyositis", "inflammatory myopathy", "myositis"],
+        "Fibromyalgia": ["fibromyalgia", "fibromyalgia syndrome", "fms ", "fms,", "fms.", "fms)"],
+        "ILD": ["interstitial lung disease", "ild ", "ild,", "ild.", "ild)", "pulmonary fibrosis"]
+    }
     
-    # Sample common technical terms
-    techniques = [
-        "DMARDs", "NSAIDs", "Corticosteroids", "TNF Inhibitors", "JAK Inhibitors",
-        "Methotrexate", "Ultrasound", "MRI", "X-ray", "Synovial Fluid",
-        "Biomarkers", "Remission", "Flare", "Comorbidity", "Pathogenesis",
-        "Randomized Trial", "Meta-Analysis", "Review", "Guidelines"
-    ]
+    # Treatment categories
+    treatments = {
+        "DMARDs": ["disease-modifying", "dmard", "conventional synthetic", "csdmard"],
+        "Biologics": ["biologic", "tnf inhibitor", "tnf-alpha", "bDMARD"],
+        "JAK Inhibitors": ["jak inhibitor", "janus kinase", "tofacitinib", "baricitinib", "upadacitinib"],
+        "Corticosteroids": ["corticosteroid", "glucocorticoid", "prednisone", "methylprednisolone"],
+        "NSAIDs": ["nsaid", "non-steroidal", "non steroidal", "anti-inflammatory", "ibuprofen", "naproxen"],
+        "Methotrexate": ["methotrexate", "mtx ", "mtx,", "mtx.", "mtx)"],
+        "Hydroxychloroquine": ["hydroxychloroquine", "hcq ", "hcq,", "hcq.", "hcq)", "plaquenil"],
+        "Rituximab": ["rituximab", "anti-cd20"],
+        "Immunosuppressants": ["immunosuppressant", "immunosuppressive", "cyclophosphamide", "azathioprine", "mycophenolate"]
+    }
     
-    # Convert text to lowercase for matching
+    # Document types
+    document_types = {
+        "Guidelines": ["guideline", "recommendation", "consensus", "eular", "acr criteria"],
+        "Clinical Trial": ["clinical trial", "phase iii", "phase 3", "randomized", "randomised", "rct ", "rct,", "rct."],
+        "Meta-Analysis": ["meta-analysis", "meta analysis", "systematic review"],
+        "Cohort Study": ["cohort study", "longitudinal study", "observational study"],
+        "Case Report": ["case report", "case series"],
+        "Review": ["review", "literature review"]
+    }
+    
+    # Convert text to lowercase for case-insensitive matching
     text_lower = text.lower()
     
     # Find matches
     tags = []
     
-    # Check each field
-    for field in fields:
-        if field.lower() in text_lower:
-            tags.append(field)
+    # Check for disease terms
+    for disease, terms in diseases.items():
+        for term in terms:
+            if term in text_lower:
+                tags.append(disease)
+                break
     
-    # Check each technique
-    for technique in techniques:
-        if technique.lower() in text_lower:
-            tags.append(technique)
+    # Check for treatment terms
+    for treatment, terms in treatments.items():
+        for term in terms:
+            if term in text_lower:
+                tags.append(treatment)
+                break
+    
+    # Check for document type terms
+    for doc_type, terms in document_types.items():
+        for term in terms:
+            if term in text_lower:
+                tags.append(doc_type)
+                break
     
     # Limit to 5 tags maximum
     if len(tags) > 5:
-        # Randomize which tags we keep
-        random.shuffle(tags)
-        tags = tags[:5]
+        # Prioritize disease tags, then treatment tags, then document type tags
+        disease_tags = [tag for tag in tags if tag in diseases.keys()]
+        treatment_tags = [tag for tag in tags if tag in treatments.keys()]
+        doc_type_tags = [tag for tag in tags if tag in document_types.keys()]
+        
+        # Build final tag list with prioritization
+        final_tags = []
+        
+        # Add up to 2 disease tags
+        final_tags.extend(disease_tags[:2])
+        
+        # Add up to 2 treatment tags
+        if len(final_tags) < 4:
+            final_tags.extend(treatment_tags[:4-len(final_tags)])
+        
+        # Add 1 document type tag
+        if len(final_tags) < 5 and doc_type_tags:
+            final_tags.append(doc_type_tags[0])
+        
+        # If we still need more tags, add from the original list
+        if len(final_tags) < 5:
+            remaining_tags = [tag for tag in tags if tag not in final_tags]
+            final_tags.extend(remaining_tags[:5-len(final_tags)])
+        
+        tags = final_tags
     
     # If no tags were found, add some general ones
     if not tags:
-        tags = ["Research Paper", "Rheumatology"]
+        tags = ["Rheumatology", "Research Paper"]
     
     return tags
