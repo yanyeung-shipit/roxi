@@ -346,7 +346,7 @@ def get_collections():
                 'parent_id': collection.parent_id,
                 'children': [],
                 'level': 0,  # Will be calculated in second pass
-                'full_path': collection.full_path,
+                'full_path': collection.full_path(),
                 'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None
             }
             
@@ -443,7 +443,7 @@ def create_collection():
                 'name': collection.name,
                 'description': collection.description,
                 'parent_id': collection.parent_id,
-                'full_path': collection.full_path,
+                'full_path': collection.full_path(),
                 'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None,
                 'document_count': 0
             }
@@ -455,6 +455,43 @@ def create_collection():
         return jsonify({
             'success': False,
             'error': f"Failed to create collection: {str(e)}"
+        }), 500
+
+@document_routes.route('/api/collections/<int:collection_id>', methods=['GET'])
+def get_collection(collection_id):
+    """
+    Get a single collection by ID
+    """
+    try:
+        collection = Collection.query.get(collection_id)
+        
+        if not collection:
+            return jsonify({
+                'success': False,
+                'error': f'Collection with ID {collection_id} not found'
+            }), 404
+        
+        # Count documents in this collection
+        doc_count = Document.query.filter_by(collection_id=collection_id).count()
+        
+        return jsonify({
+            'success': True,
+            'collection': {
+                'id': collection.id,
+                'name': collection.name,
+                'description': collection.description,
+                'parent_id': collection.parent_id,
+                'full_path': collection.full_path(),
+                'document_count': doc_count,
+                'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None
+            }
+        })
+    except Exception as e:
+        import logging
+        logging.exception(f"Error getting collection: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to get collection: {str(e)}"
         }), 500
 
 @document_routes.route('/api/collections/<int:collection_id>', methods=['PUT'])
@@ -530,7 +567,7 @@ def update_collection(collection_id):
                 'name': collection.name,
                 'description': collection.description,
                 'parent_id': collection.parent_id,
-                'full_path': collection.full_path,
+                'full_path': collection.full_path(),
                 'document_count': doc_count,
                 'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None
             }
