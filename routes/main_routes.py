@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from models import Document, QueryHistory, ProcessingQueue
-from tasks import process_document
+from utils.document_processor import process_document_job
 from utils.pdf_processor import save_uploaded_pdf
 from utils.embeddings import search_similar_chunks
 from utils.citation_generator import format_citation_for_response
@@ -81,7 +81,7 @@ def upload_documents():
             db.session.commit()
             
             # Start background processing
-            process_document.delay(document.id)
+            process_document_job(document.id)
             
             success_count += 1
             
