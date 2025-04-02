@@ -346,7 +346,7 @@ def get_collections():
                 'parent_id': collection.parent_id,
                 'children': [],
                 'level': 0,  # Will be calculated in second pass
-                'full_path': collection.full_path(),
+                'full_path': collection.full_path,
                 'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None
             }
             
@@ -443,7 +443,7 @@ def create_collection():
                 'name': collection.name,
                 'description': collection.description,
                 'parent_id': collection.parent_id,
-                'full_path': collection.full_path(),
+                'full_path': collection.full_path,
                 'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None,
                 'document_count': 0
             }
@@ -481,7 +481,7 @@ def get_collection(collection_id):
                 'name': collection.name,
                 'description': collection.description,
                 'parent_id': collection.parent_id,
-                'full_path': collection.full_path(),
+                'full_path': collection.full_path,
                 'document_count': doc_count,
                 'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None
             }
@@ -567,7 +567,7 @@ def update_collection(collection_id):
                 'name': collection.name,
                 'description': collection.description,
                 'parent_id': collection.parent_id,
-                'full_path': collection.full_path(),
+                'full_path': collection.full_path,
                 'document_count': doc_count,
                 'created_at': collection.created_at.isoformat() if hasattr(collection, 'created_at') else None
             }
