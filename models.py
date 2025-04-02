@@ -5,6 +5,35 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSON
 
 from app import db
 
+class Collection(db.Model):
+    """Model for organizing documents into collections (folders) with nesting support"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    parent_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=True)
+    
+    # Relationships
+    documents = db.relationship('Document', backref='collection', lazy=True)
+    children = db.relationship('Collection', 
+                              backref=db.backref('parent', remote_side=[id]),
+                              lazy='dynamic')
+    
+    def __repr__(self):
+        return f"<Collection {self.name}>"
+    
+    @property
+    def full_path(self):
+        """Get the full path of collection names, starting from the root"""
+        path = [self.name]
+        current = self.parent
+        
+        while current:
+            path.insert(0, current.name)
+            current = current.parent
+            
+        return " / ".join(path)
+
 class Document(db.Model):
     """Model for storing document information"""
     id = db.Column(db.Integer, primary_key=True)
@@ -19,6 +48,8 @@ class Document(db.Model):
     upload_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     processed = db.Column(db.Boolean, default=False)
     full_text = db.Column(db.Text)
+    # Added collection_id foreign key
+    collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=True)
     
     def __repr__(self):
         return f"<Document {self.id}: {self.title}>"

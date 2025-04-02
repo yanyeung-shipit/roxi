@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from werkzeug.utils import secure_filename
 
 from app import db
-from models import Document, QueryHistory, ProcessingQueue
+from models import Document, QueryHistory, ProcessingQueue, Collection
 from utils.document_processor import process_document_job
 from utils.pdf_processor import save_uploaded_pdf
 from utils.embeddings import search_similar_chunks
@@ -66,11 +66,27 @@ def upload_documents():
             unique_filename = f"{str(uuid.uuid4())[:8]}_{filename}"
             saved_path = save_uploaded_pdf(file, unique_filename)
             
+            # Get collection_id if provided
+            collection_id = request.form.get('collection_id')
+            
+            # Verify collection exists if provided
+            if collection_id and collection_id.strip():
+                try:
+                    collection_id = int(collection_id)
+                    collection = Collection.query.get(collection_id)
+                    if not collection:
+                        collection_id = None
+                except (ValueError, TypeError):
+                    collection_id = None
+            else:
+                collection_id = None
+            
             # Create document record in database
             document = Document(
                 filename=unique_filename,
                 title=os.path.splitext(filename)[0][:500],  # Use filename as initial title (will be updated during processing)
-                upload_date=datetime.utcnow()
+                upload_date=datetime.utcnow(),
+                collection_id=collection_id
             )
             db.session.add(document)
             db.session.flush()  # Get the document ID

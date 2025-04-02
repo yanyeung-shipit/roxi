@@ -8,13 +8,47 @@ function initDocumentBrowser() {
     const documentCount = document.getElementById('documentCount');
     const documentDetails = document.getElementById('documentDetails');
     const pagination = document.getElementById('pagination');
+    const collectionFilter = document.getElementById('collectionFilter');
+    const uploadCollection = document.getElementById('uploadCollection');
+    const actionButtons = document.querySelector('.action-buttons');
+    const newCollectionButton = document.getElementById('newCollectionButton');
+    const editDocumentButton = document.getElementById('editDocumentButton');
+    const deleteDocumentButton = document.getElementById('deleteDocumentButton');
+    
+    // Modals
+    const editDocumentModal = new bootstrap.Modal(document.getElementById('editDocumentModal'));
+    const collectionModal = new bootstrap.Modal(document.getElementById('collectionModal'));
+    const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+    
+    // Modal elements
+    const editDocumentId = document.getElementById('editDocumentId');
+    const editDocumentTitle = document.getElementById('editDocumentTitle');
+    const editDocumentTags = document.getElementById('editDocumentTags');
+    const editDocumentCollection = document.getElementById('editDocumentCollection');
+    const saveDocumentButton = document.getElementById('saveDocumentButton');
+    
+    const collectionId = document.getElementById('collectionId');
+    const collectionName = document.getElementById('collectionName');
+    const collectionDescription = document.getElementById('collectionDescription');
+    const collectionParent = document.getElementById('collectionParent');
+    const collectionModalTitle = document.getElementById('collectionModalTitle');
+    const saveCollectionButton = document.getElementById('saveCollectionButton');
+    const deleteCollectionButton = document.getElementById('deleteCollectionButton');
+    
+    const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
+    const confirmDeleteButton = document.getElementById('confirmDeleteButton');
     
     // State
     let currentPage = 1;
     let totalPages = 1;
     let activeTag = null;
+    let activeCollection = '';
     let searchTerm = '';
     let documents = [];
+    let collections = [];
+    let currentDocumentId = null;
+    let deleteType = null; // 'document' or 'collection'
+    let deleteId = null;
     
     // Initial load
     loadDocuments();
@@ -50,6 +84,10 @@ function initDocumentBrowser() {
         
         if (activeTag) {
             params.append('tag', activeTag);
+        }
+        
+        if (activeCollection) {
+            params.append('collection_id', activeCollection);
         }
         
         if (searchTerm) {
@@ -140,6 +178,11 @@ function initDocumentBrowser() {
                 '<span class="document-status-processed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span>' : 
                 '<span class="document-status-pending"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>';
             
+            // Show collection badge if available
+            const collectionBadge = doc.collection 
+                ? `<span class="badge bg-primary collection-badge me-2"><i class="fas fa-folder me-1"></i>${escapeHtml(doc.collection.name)}</span>` 
+                : '';
+            
             const card = document.createElement('div');
             card.className = 'card document-card mb-3';
             card.dataset.id = doc.id;
@@ -154,7 +197,8 @@ function initDocumentBrowser() {
                         ${doc.journal ? `${escapeHtml(doc.journal)} - ` : ''}
                         ${formatDate(doc.publication_date || doc.upload_date)}
                     </p>
-                    <div class="mt-2">
+                    <div class="d-flex flex-wrap mt-2 align-items-center">
+                        ${collectionBadge}
                         ${tags}
                     </div>
                 </div>
@@ -276,6 +320,9 @@ function initDocumentBrowser() {
      * Show document details
      */
     function showDocumentDetails(documentId) {
+        // Store current document ID
+        currentDocumentId = documentId;
+        
         // Show loading state
         documentDetails.innerHTML = `
             <div class="text-center p-5">
@@ -285,6 +332,11 @@ function initDocumentBrowser() {
                 <p class="mt-3 text-muted">Loading document details...</p>
             </div>
         `;
+        
+        // Hide action buttons while loading
+        if (actionButtons) {
+            actionButtons.classList.add('d-none');
+        }
         
         // Fetch document details
         fetch(`/documents/api/documents/${documentId}`)
@@ -304,6 +356,11 @@ function initDocumentBrowser() {
                 const status = doc.processed ? 
                     '<span class="badge bg-success">Processed</span>' : 
                     '<span class="badge bg-warning">Processing</span>';
+                
+                // Get collection info
+                const collectionName = doc.collection ? 
+                    `<a href="#" class="collection-link" data-collection-id="${doc.collection.id}">${escapeHtml(doc.collection.name)}</a>` : 
+                    'None';
                 
                 // Format document details
                 documentDetails.innerHTML = `
@@ -325,6 +382,9 @@ function initDocumentBrowser() {
                         <dt>Upload Date</dt>
                         <dd>${formatDate(doc.upload_date)}</dd>
                         
+                        <dt>Collection</dt>
+                        <dd>${collectionName}</dd>
+                        
                         <dt>Status</dt>
                         <dd>${status}</dd>
                         
@@ -339,6 +399,27 @@ function initDocumentBrowser() {
                         </div>
                     ` : ''}
                 `;
+                
+                // Show action buttons
+                if (actionButtons) {
+                    actionButtons.classList.remove('d-none');
+                }
+                
+                // Add click handlers for collection links
+                const collectionLinks = documentDetails.querySelectorAll('.collection-link');
+                collectionLinks.forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const collectionId = link.dataset.collectionId;
+                        // Update collection filter
+                        if (collectionFilter) {
+                            collectionFilter.value = collectionId;
+                            // Trigger change event
+                            const event = new Event('change');
+                            collectionFilter.dispatchEvent(event);
+                        }
+                    });
+                });
             })
             .catch(error => {
                 console.error('Error loading document details:', error);
@@ -347,6 +428,11 @@ function initDocumentBrowser() {
                         <strong>Error loading document details.</strong> Please try again.
                     </div>
                 `;
+                
+                // Hide action buttons
+                if (actionButtons) {
+                    actionButtons.classList.add('d-none');
+                }
             });
     }
     
@@ -451,5 +537,468 @@ function initDocumentBrowser() {
                 func.apply(context, args);
             }, wait);
         };
+    }
+    
+    /**
+     * Load collections
+     */
+    function loadCollections() {
+        fetch('/documents/api/collections')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load collections');
+                }
+                
+                collections = data.collections;
+                
+                // Sort collections by parent_id (null first), then by level, then by name
+                collections.sort((a, b) => {
+                    // First sort by level
+                    if (a.level !== b.level) return a.level - b.level;
+                    
+                    // Then by name for collections at the same level
+                    return a.name.localeCompare(b.name);
+                });
+                
+                // Update collection filters
+                if (collectionFilter) {
+                    // Save current value
+                    const currentValue = collectionFilter.value;
+                    
+                    // Clear options except first one (All Collections)
+                    while (collectionFilter.options.length > 1) {
+                        collectionFilter.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        // Show document count
+                        const docCount = collection.total_document_count > 0 ? 
+                            ` (${collection.total_document_count})` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}${docCount}`;
+                        collectionFilter.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        collectionFilter.value = currentValue;
+                    }
+                }
+                
+                // Update upload collection dropdown
+                if (uploadCollection) {
+                    // Save current value
+                    const currentValue = uploadCollection.value;
+                    
+                    // Clear options except first one (None)
+                    while (uploadCollection.options.length > 1) {
+                        uploadCollection.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}`;
+                        uploadCollection.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        uploadCollection.value = currentValue;
+                    }
+                }
+                
+                // Update edit document collection dropdown
+                if (editDocumentCollection) {
+                    // Save current value
+                    const currentValue = editDocumentCollection.value;
+                    
+                    // Clear options except first one (None)
+                    while (editDocumentCollection.options.length > 1) {
+                        editDocumentCollection.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}`;
+                        editDocumentCollection.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        editDocumentCollection.value = currentValue;
+                    }
+                }
+                
+                // Update collection parent dropdown
+                if (collectionParent) {
+                    // Save current value
+                    const currentValue = collectionParent.value;
+                    
+                    // Clear options except first one (None/Root)
+                    while (collectionParent.options.length > 1) {
+                        collectionParent.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        // Skip the current collection if editing (can't be its own parent)
+                        if (collectionId.value && collection.id.toString() === collectionId.value) {
+                            return;
+                        }
+                        
+                        // Skip this collection's descendants if editing (avoid circular references)
+                        if (collectionId.value && collectionIsDescendantOf(collection.id, parseInt(collectionId.value))) {
+                            return;
+                        }
+                        
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}`;
+                        collectionParent.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        collectionParent.value = currentValue;
+                    }
+                }
+                
+                // Sort collections for other operations
+                collections.sort((a, b) => a.name.localeCompare(b.name));
+            }
+            })
+            .catch(error => {
+                console.error('Error loading collections:', error);
+                // Show error toast
+                showAlert('Error loading collections. Please try again.', 'danger');
+            });
+    }
+    
+    // Initial collections load
+    loadCollections();
+    
+    // Add event listeners for collection filter
+    if (collectionFilter) {
+        collectionFilter.addEventListener('change', () => {
+            activeCollection = collectionFilter.value;
+            currentPage = 1;
+            loadDocuments();
+        });
+    }
+    
+    // Add event listeners for modals and buttons
+    
+    // New Collection button
+    if (newCollectionButton) {
+        newCollectionButton.addEventListener('click', () => {
+            // Reset form
+            collectionId.value = '';
+            collectionName.value = '';
+            collectionDescription.value = '';
+            collectionModalTitle.textContent = 'New Collection';
+            // Hide delete button for new collections
+            deleteCollectionButton.classList.add('d-none');
+            // Show modal
+            collectionModal.show();
+        });
+    }
+    
+    // Edit document button
+    if (editDocumentButton) {
+        editDocumentButton.addEventListener('click', () => {
+            // Get current document data
+            if (!currentDocumentId) {
+                showAlert('No document selected.', 'warning');
+                return;
+            }
+            
+            fetch(`/documents/api/documents/${currentDocumentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to load document data');
+                    }
+                    
+                    // Fill form
+                    editDocumentId.value = data.id;
+                    editDocumentTitle.value = data.title || '';
+                    editDocumentTags.value = data.tags ? data.tags.join(', ') : '';
+                    editDocumentCollection.value = data.collection ? data.collection.id : '';
+                    
+                    // Show modal
+                    editDocumentModal.show();
+                })
+                .catch(error => {
+                    console.error('Error loading document data:', error);
+                    showAlert('Error loading document data. Please try again.', 'danger');
+                });
+        });
+    }
+    
+    // Delete document button
+    if (deleteDocumentButton) {
+        deleteDocumentButton.addEventListener('click', () => {
+            if (!currentDocumentId) {
+                showAlert('No document selected.', 'warning');
+                return;
+            }
+            
+            // Setup confirmation modal
+            deleteType = 'document';
+            deleteId = currentDocumentId;
+            deleteConfirmMessage.textContent = 'Are you sure you want to delete this document? This will permanently remove the document, all its content chunks, and the associated PDF file. This action cannot be undone.';
+            
+            // Show confirmation modal
+            deleteConfirmModal.show();
+        });
+    }
+    
+    // Save document button
+    if (saveDocumentButton) {
+        saveDocumentButton.addEventListener('click', () => {
+            const docId = editDocumentId.value;
+            const title = editDocumentTitle.value.trim();
+            const tags = editDocumentTags.value.trim()
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(tag => tag.length > 0);
+            const collectionId = editDocumentCollection.value;
+            
+            if (!title) {
+                showAlert('Please enter a title.', 'warning');
+                return;
+            }
+            
+            // Prepare data
+            const data = {
+                title: title,
+                tags: tags
+            };
+            
+            if (collectionId) {
+                data.collection_id = parseInt(collectionId);
+            }
+            
+            // Update document
+            fetch(`/documents/api/documents/${docId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to update document');
+                    }
+                    
+                    // Close modal
+                    editDocumentModal.hide();
+                    
+                    // Reload document list
+                    loadDocuments();
+                    
+                    // Reload document details
+                    showDocumentDetails(docId);
+                    
+                    // Show success toast
+                    showAlert('Document updated successfully.', 'success');
+                })
+                .catch(error => {
+                    console.error('Error updating document:', error);
+                    showAlert('Error updating document. Please try again.', 'danger');
+                });
+        });
+    }
+    
+    // Save collection button
+    if (saveCollectionButton) {
+        saveCollectionButton.addEventListener('click', () => {
+            const id = collectionId.value;
+            const name = collectionName.value.trim();
+            const description = collectionDescription.value.trim();
+            const parentId = collectionParent.value;
+            
+            if (!name) {
+                showAlert('Please enter a collection name.', 'warning');
+                return;
+            }
+            
+            // Prepare data
+            const data = {
+                name: name,
+                description: description
+            };
+            
+            // Add parent_id if selected
+            if (parentId) {
+                data.parent_id = parseInt(parentId);
+            } else {
+                data.parent_id = null;
+            }
+            
+            // Create or update collection
+            const url = id ? `/documents/api/collections/${id}` : '/documents/api/collections';
+            const method = id ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to save collection');
+                    }
+                    
+                    // Close modal
+                    collectionModal.hide();
+                    
+                    // Reload collections
+                    loadCollections();
+                    
+                    // Show success toast
+                    showAlert(`Collection ${id ? 'updated' : 'created'} successfully.`, 'success');
+                })
+                .catch(error => {
+                    console.error('Error saving collection:', error);
+                    showAlert('Error saving collection. Please try again.', 'danger');
+                });
+        });
+    }
+    
+    // Delete collection button
+    if (deleteCollectionButton) {
+        deleteCollectionButton.addEventListener('click', () => {
+            const id = collectionId.value;
+            
+            if (!id) {
+                showAlert('No collection selected.', 'warning');
+                return;
+            }
+            
+            // Setup confirmation modal
+            deleteType = 'collection';
+            deleteId = id;
+            deleteConfirmMessage.textContent = 'Are you sure you want to delete this collection? Documents in this collection will not be deleted, but they will no longer be associated with any collection. This action cannot be undone.';
+            
+            // Hide collection modal
+            collectionModal.hide();
+            
+            // Show confirmation modal
+            deleteConfirmModal.show();
+        });
+    }
+    
+    // Delete confirmation button
+    if (confirmDeleteButton) {
+        confirmDeleteButton.addEventListener('click', () => {
+            if (!deleteType || !deleteId) {
+                showAlert('Invalid delete request.', 'warning');
+                deleteConfirmModal.hide();
+                return;
+            }
+            
+            let url = '';
+            let successMessage = '';
+            
+            if (deleteType === 'document') {
+                url = `/documents/api/documents/${deleteId}`;
+                successMessage = 'Document deleted successfully.';
+            } else if (deleteType === 'collection') {
+                url = `/documents/api/collections/${deleteId}`;
+                successMessage = 'Collection deleted successfully.';
+            }
+            
+            fetch(url, {
+                method: 'DELETE'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to delete item');
+                    }
+                    
+                    // Close modal
+                    deleteConfirmModal.hide();
+                    
+                    if (deleteType === 'document') {
+                        // Reload document list
+                        loadDocuments();
+                        
+                        // Clear document details
+                        documentDetails.innerHTML = `
+                            <div class="text-center p-5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                <p class="text-muted">Document deleted</p>
+                            </div>
+                        `;
+                        
+                        // Hide action buttons
+                        if (actionButtons) {
+                            actionButtons.classList.add('d-none');
+                        }
+                        
+                        // Reset current document ID
+                        currentDocumentId = null;
+                    } else if (deleteType === 'collection') {
+                        // Reload collections
+                        loadCollections();
+                        
+                        // Reload documents if we were filtered by the deleted collection
+                        if (activeCollection === deleteId.toString()) {
+                            activeCollection = '';
+                            if (collectionFilter) {
+                                collectionFilter.value = '';
+                            }
+                            loadDocuments();
+                        }
+                    }
+                    
+                    // Show success toast
+                    showAlert(successMessage, 'success');
+                    
+                    // Reset delete state
+                    deleteType = null;
+                    deleteId = null;
+                })
+                .catch(error => {
+                    console.error('Error deleting item:', error);
+                    showAlert('Error deleting item. Please try again.', 'danger');
+                    deleteConfirmModal.hide();
+                });
+        });
     }
 }
