@@ -1,0 +1,204 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <h2 class="h4">System Monitoring Dashboard</h2>
+        <p class="text-muted">
+            Monitor system performance, document processing status, and resource usage.
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Documents stats -->
+    <div class="col-md-3">
+        <div class="metric-card">
+            <div class="metric-label">Total Documents</div>
+            <div class="metric-value" id="total-documents">-</div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="metric-card">
+            <div class="metric-label">Processed Documents</div>
+            <div class="metric-value" id="processed-documents">-</div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="metric-card">
+            <div class="metric-label">Pending Documents</div>
+            <div class="metric-value" id="pending-documents">-</div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="metric-card">
+            <div class="metric-label">Processing Status</div>
+            <div class="progress mt-2 mb-2">
+                <div id="document-progress" class="progress-bar bg-success" role="progressbar" style="width: 0%;" 
+                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Queue status -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Processing Queue Status</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Pending:</span>
+                            <span id="queue-pending" class="fw-bold">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Processing:</span>
+                            <span id="queue-processing" class="fw-bold">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Completed:</span>
+                            <span id="queue-completed" class="fw-bold">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Failed:</span>
+                            <span id="queue-failed" class="fw-bold">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="progress mt-2">
+                    <div id="pending-progress" class="progress-bar bg-warning" role="progressbar" style="width: 0%;" 
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div id="processing-progress" class="progress-bar bg-info" role="progressbar" style="width: 0%;" 
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div id="completed-progress" class="progress-bar bg-success" role="progressbar" style="width: 0%;" 
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div id="failed-progress" class="progress-bar bg-danger" role="progressbar" style="width: 0%;" 
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current CPU/Memory stats -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Current Resource Usage</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex flex-column align-items-center">
+                            <div class="fs-5">CPU Usage</div>
+                            <div id="current-cpu" class="display-6 fw-bold">-</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex flex-column align-items-center">
+                            <div class="fs-5">Memory Usage</div>
+                            <div id="current-memory" class="display-6 fw-bold">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- CPU usage chart -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="h5 mb-0">CPU Usage Over Time</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="cpu-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Memory usage chart -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Memory Usage Over Time</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="memory-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Chunks processed/pending chart -->
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Chunks Processed/Pending Over Time</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="chunks-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Processing queue table -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Processing Queue Details</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Document</th>
+                                <th>Status</th>
+                                <th>Timestamp</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-table-body">
+                            <!-- Queue entries will be loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
+{% endblock %}
