@@ -7,76 +7,25 @@
         <div class="card">
             <div class="card-body p-4">
                 <h1 class="card-title text-center mb-4">
-                    <span class="text-primary">R</span>esearch <span class="text-primary">O</span>rganization and e<span class="text-primary">X</span>traction <span class="text-primary">I</span>nterface
+                    <span class="text-primary">R</span>heumatology <span class="text-primary">O</span>ptimized e<span class="text-primary">X</span>pert <span class="text-primary">I</span>ntelligence
                 </h1>
                 <p class="card-text text-center lead mb-5">
-                    Upload research papers, extract metadata, and query your research collection 
+                    Your AI assistant for rheumatology research
                 </p>
-                
-                <!-- File Upload Section -->
-                <div class="row mb-5">
-                    <div class="col-md-8 offset-md-2">
-                        <div class="card bg-dark">
-                            <div class="card-body p-4">
-                                <h4 class="card-title mb-3">Upload Documents</h4>
-                                
-                                <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data" class="upload-form">
-                                    <div class="mb-3">
-                                        <div class="custom-file-upload">
-                                            <input type="file" class="form-control" id="fileInput" name="files[]" multiple accept=".pdf">
-                                            <div class="upload-area">
-                                                <div class="text-center p-5">
-                                                    <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
-                                                    <p>Drag & drop PDFs here or click to browse</p>
-                                                    <small class="text-muted">Maximum 50 files per upload</small>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="d-grid">
-                                        <button type="submit" id="uploadButton" class="btn btn-primary">
-                                            <i class="fas fa-upload me-2"></i> Upload PDFs
-                                        </button>
-                                    </div>
-                                    
-                                    <!-- Upload Progress -->
-                                    <div id="uploadProgress" class="progress mt-3 d-none">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                                    </div>
-                                    
-                                    <!-- Upload Status -->
-                                    <div id="uploadStatus" class="mt-3"></div>
-                                    
-                                    <!-- Processing Queue -->
-                                    <div id="processingQueue" class="mt-3 d-none">
-                                        <h6 class="mb-2">Processing Queue</h6>
-                                        <div class="progress">
-                                            <div id="queueProgress" class="progress-bar bg-info" role="progressbar" style="width: 0%"></div>
-                                        </div>
-                                        <small class="text-muted mt-1 d-block">
-                                            <span id="queueInfo">0 / 0 processed</span>
-                                        </small>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 
                 <!-- Query Interface Section -->
                 <div class="row">
                     <div class="col-12">
                         <div class="card bg-dark">
                             <div class="card-body p-4">
-                                <h4 class="card-title mb-3">Query Your Research</h4>
+                                <h4 class="card-title mb-3">What would you like to know?</h4>
                                 
                                 <div class="row">
                                     <!-- Query Input -->
                                     <div class="col-12 mb-3">
                                         <form id="queryForm">
                                             <div class="input-group">
-                                                <input type="text" id="queryInput" class="form-control" placeholder="Ask a question about your documents...">
+                                                <input type="text" id="queryInput" class="form-control" placeholder="Ask ROXI">
                                                 <button class="btn btn-primary" type="submit">
                                                     <i class="fas fa-search me-2"></i> Search
                                                 </button>
@@ -120,7 +69,6 @@
 <script src="{{ url_for('static', filename='js/query_interface.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        initFileUpload();
         initQueryInterface();
     });
 </script>
