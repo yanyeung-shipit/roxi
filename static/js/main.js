@@ -2,118 +2,180 @@
  * Initialize the file upload functionality
  */
 function initFileUpload() {
-    const uploadForm = document.getElementById('upload-form');
-    const uploadStatus = document.getElementById('upload-status');
-    const uploadMessage = document.getElementById('upload-message');
-    const processingProgress = document.getElementById('processing-progress');
-    const processingStatus = document.getElementById('processing-status');
+    const uploadForm = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const uploadButton = document.getElementById('uploadButton');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const processingQueue = document.getElementById('processingQueue');
+    const queueInfo = document.getElementById('queueInfo');
+    const queueProgress = document.getElementById('queueProgress');
     
     if (!uploadForm) return;
     
-    uploadForm.addEventListener('submit', function(e) {
+    // Handle drag and drop events
+    uploadForm.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadForm.classList.add('drag-over');
+    });
+    
+    uploadForm.addEventListener('dragleave', () => {
+        uploadForm.classList.remove('drag-over');
+    });
+    
+    uploadForm.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadForm.classList.remove('drag-over');
+        
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            const fileCount = fileInput.files.length;
+            uploadButton.textContent = `Upload ${fileCount} file${fileCount !== 1 ? 's' : ''}`;
+        }
+    });
+    
+    // Update button text when files are selected
+    fileInput.addEventListener('change', () => {
+        const fileCount = fileInput.files.length;
+        uploadButton.textContent = fileCount > 0 
+            ? `Upload ${fileCount} file${fileCount !== 1 ? 's' : ''}`
+            : 'Upload PDFs';
+    });
+    
+    // Handle form submission
+    uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const formData = new FormData(uploadForm);
-        const files = formData.getAll('files[]');
-        
-        if (files.length === 0 || (files.length === 1 && files[0].size === 0)) {
+        if (fileInput.files.length === 0) {
             showAlert('Please select at least one PDF file to upload.', 'warning');
             return;
         }
         
-        if (files.length > 50) {
+        if (fileInput.files.length > 50) {
             showAlert('Maximum 50 files allowed per upload.', 'warning');
             return;
         }
         
-        // Update UI to show upload in progress
-        uploadStatus.classList.remove('d-none');
-        uploadStatus.classList.remove('alert-danger', 'alert-success');
-        uploadStatus.classList.add('alert-info');
-        uploadMessage.textContent = 'Uploading files...';
+        const formData = new FormData(uploadForm);
         
-        // Send the files to the server
-        fetch('/upload', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                uploadStatus.classList.remove('alert-info', 'alert-danger');
-                uploadStatus.classList.add('alert-success');
-                uploadMessage.textContent = data.message;
-                
-                // Reset the form
-                uploadForm.reset();
-                
-                // Update processing status
-                processingProgress.style.width = '5%';
-                processingProgress.textContent = '5%';
-                processingStatus.textContent = 'Processing queued documents...';
-                
-                // Check status periodically
-                checkProcessingStatus();
-            } else {
-                uploadStatus.classList.remove('alert-info', 'alert-success');
-                uploadStatus.classList.add('alert-danger');
-                uploadMessage.textContent = data.error || 'Upload failed';
-                
-                if (data.errors && data.errors.length > 0) {
-                    const errorList = document.createElement('ul');
-                    errorList.className = 'mt-2 mb-0';
-                    
-                    data.errors.forEach(error => {
-                        const li = document.createElement('li');
-                        li.textContent = error;
-                        errorList.appendChild(li);
-                    });
-                    
-                    uploadMessage.appendChild(errorList);
+        // Show progress
+        uploadButton.disabled = true;
+        uploadProgress.classList.remove('d-none');
+        uploadProgress.querySelector('.progress-bar').style.width = '0%';
+        uploadStatus.innerHTML = '<div class="alert alert-info">Uploading files...</div>';
+        
+        try {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.open('POST', '/upload');
+            
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    uploadProgress.querySelector('.progress-bar').style.width = percentComplete + '%';
                 }
-            }
-        })
-        .catch(error => {
-            uploadStatus.classList.remove('alert-info', 'alert-success');
-            uploadStatus.classList.add('alert-danger');
-            uploadMessage.textContent = 'Error: ' + error.message;
-        });
+            });
+            
+            xhr.onload = function() {
+                uploadButton.disabled = false;
+                
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    
+                    if (response.success) {
+                        // Show success message
+                        uploadStatus.innerHTML = `<div class="alert alert-success">${response.message}</div>`;
+                        
+                        // Reset form
+                        uploadForm.reset();
+                        uploadButton.textContent = 'Upload PDFs';
+                        
+                        // Check processing status periodically
+                        checkProcessingStatus();
+                        
+                        // If there were some errors with individual files
+                        if (response.errors && response.errors.length > 0) {
+                            const errorList = response.errors.map(err => `<li>${err}</li>`).join('');
+                            uploadStatus.innerHTML += `
+                                <div class="alert alert-warning mt-2">
+                                    <strong>Some files had issues:</strong>
+                                    <ul>${errorList}</ul>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        // Show error message
+                        let errorMsg = response.error;
+                        if (response.errors && response.errors.length > 0) {
+                            const errorList = response.errors.map(err => `<li>${err}</li>`).join('');
+                            errorMsg += `<ul>${errorList}</ul>`;
+                        }
+                        uploadStatus.innerHTML = `<div class="alert alert-danger">${errorMsg}</div>`;
+                    }
+                } else {
+                    // Show error message
+                    uploadStatus.innerHTML = '<div class="alert alert-danger">Upload failed. Please try again.</div>';
+                }
+                
+                uploadProgress.classList.add('d-none');
+            };
+            
+            xhr.onerror = function() {
+                uploadButton.disabled = false;
+                uploadProgress.classList.add('d-none');
+                uploadStatus.innerHTML = '<div class="alert alert-danger">Network error. Please try again.</div>';
+            };
+            
+            xhr.send(formData);
+            
+        } catch (error) {
+            uploadButton.disabled = false;
+            uploadProgress.classList.add('d-none');
+            uploadStatus.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        }
     });
     
-    // Check processing status periodically
     function checkProcessingStatus() {
-        fetch('/monitoring/queue')
-        .then(response => response.json())
-        .then(data => {
-            const { pending, processing, completed, failed, total } = data;
-            
-            if (total === 0) {
-                processingProgress.style.width = '100%';
-                processingProgress.textContent = 'Complete';
-                processingStatus.textContent = 'No documents in processing queue.';
-                return;
-            }
-            
-            const progress = Math.round(((completed + failed) / total) * 100);
-            processingProgress.style.width = progress + '%';
-            processingProgress.textContent = progress + '%';
-            
-            if (pending === 0 && processing === 0) {
-                processingStatus.textContent = `All documents processed (${completed} completed, ${failed} failed).`;
-            } else {
-                processingStatus.textContent = `${processing} processing, ${pending} pending, ${completed} completed, ${failed} failed.`;
-                // Check again in 5 seconds
-                setTimeout(checkProcessingStatus, 5000);
-            }
-        })
-        .catch(error => {
-            console.error('Error checking processing status:', error);
-            processingStatus.textContent = 'Error checking processing status.';
-        });
+        // Show processing queue status
+        processingQueue.classList.remove('d-none');
+        
+        // Start checking queue status
+        const checkQueue = () => {
+            fetch('/monitoring/queue')
+                .then(response => response.json())
+                .then(data => {
+                    const total = data.total;
+                    const pending = data.pending;
+                    const processing = data.processing;
+                    const completed = data.completed;
+                    const failed = data.failed;
+                    
+                    // Update queue info
+                    queueInfo.textContent = `${completed + failed} / ${total} processed`;
+                    
+                    // Update progress bar
+                    const percentComplete = ((completed + failed) / total) * 100;
+                    queueProgress.style.width = percentComplete + '%';
+                    
+                    // Continue checking if there are still pending or processing documents
+                    if (pending > 0 || processing > 0) {
+                        setTimeout(checkQueue, 5000); // Check again in 5 seconds
+                    } else {
+                        // All documents processed
+                        setTimeout(() => {
+                            processingQueue.classList.add('d-none');
+                        }, 3000); // Hide after 3 seconds
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking queue status:', error);
+                    processingQueue.classList.add('d-none');
+                });
+        };
+        
+        // Start checking
+        checkQueue();
     }
-    
-    // Initial check for processing status
-    checkProcessingStatus();
 }
 
 /**
@@ -129,14 +191,14 @@ function showAlert(message, type = 'info') {
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
     
-    // Find the container and prepend the alert
+    // Find a good place to show the alert
     const container = document.querySelector('.container');
     container.insertBefore(alertDiv, container.firstChild);
     
-    // Automatically dismiss after 5 seconds
+    // Auto-dismiss after 5 seconds
     setTimeout(() => {
-        const bsAlert = new bootstrap.Alert(alertDiv);
-        bsAlert.close();
+        alertDiv.classList.remove('show');
+        setTimeout(() => alertDiv.remove(), 150);
     }, 5000);
 }
 
@@ -148,8 +210,3 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-
-// Initialize everything when the DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    initFileUpload();
-});

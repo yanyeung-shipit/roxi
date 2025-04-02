@@ -2,10 +2,12 @@ import os
 import logging
 import datetime
 import random
+from dateutil.parser import parse as parse_date
 import numpy as np
-import celery
-from app import celery as celery_app
-from models import db, Document, TextChunk, ProcessingQueue, VectorEmbedding
+from celery import shared_task
+
+from app import db
+from models import Document, TextChunk, VectorEmbedding, ProcessingQueue
 from utils.pdf_processor import extract_text_from_pdf, chunk_text
 from utils.embeddings import generate_embeddings
 from utils.doi_validator import extract_and_validate_doi
@@ -14,206 +16,250 @@ from utils.system_monitor import update_system_metrics
 
 logger = logging.getLogger(__name__)
 
-@celery_app.task
+@shared_task
 def process_document(document_id):
     """Main task to process a document in the background"""
-    logger.info(f"Starting processing for document_id: {document_id}")
+    logger.info(f"Starting to process document: {document_id}")
+    
+    # Get the document and its queue entry
+    document = Document.query.get(document_id)
+    queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).first()
+    
+    if not document or not queue_entry:
+        logger.error(f"Document or queue entry not found for ID: {document_id}")
+        return False
     
     try:
-        # Get document and queue entry
-        document = Document.query.get(document_id)
-        queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).first()
-        
-        if not document or not queue_entry:
-            logger.error(f"Document or queue entry not found for id: {document_id}")
-            return False
-        
-        # Update queue status
+        # Update queue status to processing
         queue_entry.status = 'processing'
         queue_entry.started_at = datetime.datetime.utcnow()
         db.session.commit()
         
-        # Step 1: Extract text from PDF
-        pdf_path = document.filename
-        if not os.path.isfile(pdf_path):
-            logger.error(f"PDF file not found: {pdf_path}")
-            queue_entry.status = 'failed'
-            queue_entry.error_message = "PDF file not found"
-            db.session.commit()
-            return False
+        # Get the file path
+        upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+        file_path = os.path.join(upload_folder, document.filename)
         
-        text = extract_text_from_pdf(pdf_path)
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"PDF file not found: {file_path}")
+        
+        # Extract text from the PDF
+        text = extract_text_from_pdf(file_path)
+        
         if not text:
-            logger.error(f"Failed to extract text from PDF: {pdf_path}")
-            queue_entry.status = 'failed'
-            queue_entry.error_message = "Failed to extract text from PDF"
-            db.session.commit()
-            return False
+            raise ValueError("Failed to extract text from PDF")
         
-        # Store full text in document
+        # Store the full text in the document
         document.full_text = text
-        db.session.commit()
         
-        # Step 2: Try to extract and validate DOI
+        # Try to extract and validate DOI
         metadata = extract_and_validate_doi(text)
+        
+        # Update document metadata if DOI validation succeeded
         if metadata:
-            logger.info(f"DOI metadata found for document: {document_id}")
-            # Update document with metadata
-            document.title = metadata.get('title', document.title)
-            document.authors = metadata.get('authors', document.authors)
-            document.journal = metadata.get('journal', document.journal)
-            document.publication_date = metadata.get('publication_date', document.publication_date)
-            document.doi = metadata.get('doi', document.doi)
-            db.session.commit()
+            # Update document with metadata from Crossref or other source
+            document.doi = metadata.get('DOI')
+            
+            # Get title
+            title = metadata.get('title')
+            if title and isinstance(title, list) and len(title) > 0:
+                document.title = title[0]
+            
+            # Get authors
+            authors = metadata.get('author', [])
+            if authors:
+                author_names = []
+                for author in authors:
+                    given = author.get('given', '')
+                    family = author.get('family', '')
+                    if given and family:
+                        author_names.append(f"{family}, {given}")
+                    elif family:
+                        author_names.append(family)
+                
+                if author_names:
+                    document.authors = '; '.join(author_names)
+            
+            # Get journal
+            container = metadata.get('container-title')
+            if container and isinstance(container, list) and len(container) > 0:
+                document.journal = container[0]
+            
+            # Get publication date
+            published_date = None
+            if 'published' in metadata and 'date-parts' in metadata['published']:
+                date_parts = metadata['published']['date-parts']
+                if date_parts and isinstance(date_parts, list) and len(date_parts) > 0:
+                    parts = date_parts[0]
+                    if len(parts) >= 3:
+                        # Year, month, day
+                        published_date = datetime.datetime(parts[0], parts[1], parts[2])
+                    elif len(parts) == 2:
+                        # Year, month
+                        published_date = datetime.datetime(parts[0], parts[1], 1)
+                    elif len(parts) == 1:
+                        # Just year
+                        published_date = datetime.datetime(parts[0], 1, 1)
+            
+            if published_date:
+                document.publication_date = published_date
         
-        # Step 3: Generate citation
-        citation = generate_apa_citation(document)
-        document.citation_apa = citation
-        db.session.commit()
+        # Generate APA citation
+        document.citation_apa = generate_apa_citation(document)
         
-        # Step 4: Split text into chunks
+        # Generate tags based on content
+        document.tags = generate_tags_from_content(text)
+        
+        # Split text into chunks
         chunks = chunk_text(text)
-        if not chunks:
-            logger.error(f"Failed to create text chunks for document: {document_id}")
-            queue_entry.status = 'failed'
-            queue_entry.error_message = "Failed to create text chunks"
-            db.session.commit()
-            return False
         
-        # Step 5: Store chunks and generate embeddings
-        for i, chunk_text_content in enumerate(chunks):
-            # Create text chunk
+        # Process each chunk
+        for i, chunk_text in enumerate(chunks):
+            # Create text chunk record
             chunk = TextChunk(
-                document_id=document_id,
-                text=chunk_text_content,
-                page_num=0,  # Would calculate actual page in a real implementation
+                document_id=document.id,
+                text=chunk_text,
                 chunk_index=i
             )
             db.session.add(chunk)
-            db.session.flush()  # Get chunk ID
+            db.session.flush()  # Get the chunk ID
             
-            # Generate and store embedding
-            embedding_vector = generate_embeddings(chunk_text_content)
-            if embedding_vector:
-                embedding = VectorEmbedding(
+            # Generate embeddings
+            embedding = generate_embeddings(chunk_text)
+            
+            if embedding:
+                # Create embedding record
+                vector_embedding = VectorEmbedding(
                     chunk_id=chunk.id,
-                    embedding=embedding_vector
+                    embedding=embedding
                 )
-                db.session.add(embedding)
-        
-        # Step 6: Generate tags for document
-        tags = generate_tags_from_content(text)
-        document.tags = tags
+                db.session.add(vector_embedding)
         
         # Mark document as processed
         document.processed = True
         
-        # Update queue status
+        # Update queue entry
         queue_entry.status = 'completed'
         queue_entry.completed_at = datetime.datetime.utcnow()
+        
+        # Commit all changes
         db.session.commit()
         
         logger.info(f"Successfully processed document: {document_id}")
         
-        # Process next document
-        process_next_document.delay()
-        
         return True
     
     except Exception as e:
-        logger.error(f"Error processing document {document_id}: {str(e)}")
+        # Log the error
+        logger.exception(f"Error processing document {document_id}: {str(e)}")
         
+        # Update queue entry
+        queue_entry.status = 'failed'
+        queue_entry.error_message = str(e)
+        
+        # Rollback and try to save the error
+        db.session.rollback()
         try:
-            # Update queue status with error
-            queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).first()
-            if queue_entry:
-                queue_entry.status = 'failed'
-                queue_entry.error_message = str(e)
-                db.session.commit()
-        except Exception as inner_e:
-            logger.error(f"Error updating queue entry: {str(inner_e)}")
+            db.session.add(queue_entry)
+            db.session.commit()
+        except:
+            logger.exception("Failed to update queue entry with error status")
         
         return False
 
-@celery_app.task
+@shared_task
 def process_next_document():
     """Check for pending documents and process the next one in queue"""
     try:
-        # Find the next pending document
-        next_queue = ProcessingQueue.query.filter_by(status='pending').order_by(ProcessingQueue.queued_at).first()
+        # Find the oldest pending document
+        queue_entry = ProcessingQueue.query.filter_by(status='pending').order_by(ProcessingQueue.queued_at).first()
         
-        if next_queue:
-            logger.info(f"Found next document to process: {next_queue.document_id}")
-            # Process the document
-            process_document.delay(next_queue.document_id)
+        if queue_entry:
+            # Process this document
+            process_document.delay(queue_entry.document_id)
             return True
-        else:
-            logger.info("No pending documents in queue")
-            return False
+        
+        return False
     
     except Exception as e:
-        logger.error(f"Error processing next document: {str(e)}")
+        logger.exception(f"Error in process_next_document: {str(e)}")
         return False
 
-@celery_app.task
+@shared_task
 def check_processing_queue():
     """Periodic task to check processing queue and keep the processing going"""
     try:
-        # Check and update system metrics
-        update_system_metrics()
+        # Count documents by status
+        pending_count = ProcessingQueue.query.filter_by(status='pending').count()
+        processing_count = ProcessingQueue.query.filter_by(status='processing').count()
         
-        # Count active processes
-        active_count = ProcessingQueue.query.filter_by(status='processing').count()
+        logger.info(f"Queue status: {pending_count} pending, {processing_count} processing")
         
-        # If no active processes, start processing next document
-        if active_count == 0:
+        # If we have pending documents and less than 2 documents being processed, start processing more
+        if pending_count > 0 and processing_count < 2:
             process_next_document.delay()
         
         return True
+    
     except Exception as e:
-        logger.error(f"Error checking processing queue: {str(e)}")
+        logger.exception(f"Error in check_processing_queue: {str(e)}")
         return False
 
-@celery_app.task
+@shared_task
 def update_system_metrics_task():
     """Task to update system metrics"""
-    return update_system_metrics()
+    try:
+        return update_system_metrics()
+    except Exception as e:
+        logger.exception(f"Error in update_system_metrics_task: {str(e)}")
+        return False
 
 def generate_tags_from_content(text):
     """Generate tags from document content using NLP techniques"""
-    # In a real implementation, this would use NLP to extract keywords
-    # For simplicity, we'll extract some random words from the text
+    # This is a placeholder for demo purposes
+    # In a real system, you would use NLP to extract keywords
     
-    # Basic preprocessing
-    words = text.lower().split()
-    
-    # Filter out short words and remove punctuation
-    filtered_words = [
-        word.strip('.,;:()[]{}"\'-').lower()
-        for word in words
-        if len(word.strip('.,;:()[]{}"\'-')) > 5
+    # Some common academic fields
+    fields = [
+        "Artificial Intelligence", "Machine Learning", "Deep Learning", 
+        "Computer Vision", "Natural Language Processing", "Robotics",
+        "Biology", "Chemistry", "Physics", "Mathematics", "Statistics",
+        "Medicine", "Psychology", "Neuroscience", "Genetics", "Climate Science",
+        "Economics", "Finance", "Political Science", "Sociology"
     ]
     
-    # Count word frequency
-    word_count = {}
-    for word in filtered_words:
-        if word in word_count:
-            word_count[word] += 1
-        else:
-            word_count[word] = 1
+    # Sample common technical terms
+    techniques = [
+        "Neural Networks", "Reinforcement Learning", "Supervised Learning",
+        "Unsupervised Learning", "Classification", "Regression", "Clustering",
+        "Optimization", "Algorithms", "Data Analysis", "Simulation",
+        "Statistical Analysis", "Quantum Computing", "Graph Theory",
+        "Network Analysis", "Meta-Analysis", "Review", "Survey"
+    ]
     
-    # Sort by frequency and take top words
-    sorted_words = sorted(word_count.items(), key=lambda x: x[1], reverse=True)
+    # Convert text to lowercase for matching
+    text_lower = text.lower()
     
-    # Get top 5-10 words as tags
-    tag_count = min(10, len(sorted_words))
-    if tag_count > 5:
-        tag_count = random.randint(5, tag_count)
+    # Find matches
+    tags = []
     
-    tags = [word for word, count in sorted_words[:tag_count]]
+    # Check each field
+    for field in fields:
+        if field.lower() in text_lower:
+            tags.append(field)
     
-    # In a real implementation, would filter out common words, 
-    # use stemming, lemmatization and proper NER
+    # Check each technique
+    for technique in techniques:
+        if technique.lower() in text_lower:
+            tags.append(technique)
     
-    logger.info(f"Generated {len(tags)} tags from content")
+    # Limit to 5 tags maximum
+    if len(tags) > 5:
+        # Randomize which tags we keep
+        random.shuffle(tags)
+        tags = tags[:5]
+    
+    # If no tags were found, add some general ones
+    if not tags:
+        tags = ["Research Paper", "Academic"]
+    
     return tags

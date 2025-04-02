@@ -1,10 +1,12 @@
-from flask import Blueprint, render_template, request, jsonify
-from sqlalchemy import func, or_
-from models import Document, db
+from flask import Blueprint, render_template, jsonify, request
+import sqlalchemy as sa
+from app import db
+from models import Document, ProcessingQueue
 
-document_routes = Blueprint('document_routes', __name__)
+# Create blueprint
+document_routes = Blueprint('documents', __name__, url_prefix='/documents')
 
-@document_routes.route('/documents')
+@document_routes.route('/')
 def document_browser():
     """Render the document browser page"""
     return render_template('document_browser.html')
@@ -14,38 +16,41 @@ def list_documents():
     """
     API endpoint to list documents with pagination and filtering
     """
-    # Get query parameters
+    # Get pagination parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
-    tag = request.args.get('tag', None)
-    search = request.args.get('search', None)
     
-    # Build query
+    # Get filter parameters
+    search = request.args.get('search', '')
+    tag = request.args.get('tag', '')
+    
+    # Build the query
     query = Document.query
     
-    # Apply tag filter if provided
+    # Apply filters if provided
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            sa.or_(
+                Document.title.ilike(search_term),
+                Document.authors.ilike(search_term),
+                Document.journal.ilike(search_term),
+                Document.doi.ilike(search_term)
+            )
+        )
+    
     if tag:
         query = query.filter(Document.tags.contains([tag]))
     
-    # Apply search filter if provided
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(or_(
-            Document.title.ilike(search_term),
-            Document.authors.ilike(search_term),
-            Document.journal.ilike(search_term),
-            Document.doi.ilike(search_term)
-        ))
-    
-    # Order by upload date, newest first
+    # Order by upload date (newest first)
     query = query.order_by(Document.upload_date.desc())
     
-    # Paginate
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    # Paginate results
+    paginated = query.paginate(page=page, per_page=per_page)
     
-    # Format data for response
+    # Format the response
     documents = []
-    for doc in pagination.items:
+    for doc in paginated.items:
         documents.append({
             'id': doc.id,
             'title': doc.title or 'Untitled Document',
@@ -55,18 +60,17 @@ def list_documents():
             'publication_date': doc.publication_date.isoformat() if doc.publication_date else None,
             'upload_date': doc.upload_date.isoformat(),
             'processed': doc.processed,
-            'tags': doc.tags or []
+            'tags': doc.tags
         })
     
     return jsonify({
-        'documents': documents,
-        'total': pagination.total,
-        'pages': pagination.pages,
+        'total': paginated.total,
+        'pages': paginated.pages,
         'current_page': page,
-        'has_next': pagination.has_next,
-        'has_prev': pagination.has_prev,
-        'next_page': pagination.next_num,
-        'prev_page': pagination.prev_num
+        'per_page': per_page,
+        'has_next': paginated.has_next,
+        'has_prev': paginated.has_prev,
+        'documents': documents
     })
 
 @document_routes.route('/api/tags')
@@ -74,13 +78,32 @@ def get_tags():
     """
     API endpoint to get all unique tags across documents
     """
-    # Query for unique tags
-    query = db.session.query(func.unnest(Document.tags).label('tag')).distinct()
-    tags = [tag[0] for tag in query.all() if tag[0]]
-    
-    return jsonify({
-        'tags': sorted(tags)
-    })
+    # This is a more complex query for Postgres to get all unique tags
+    # We're unnesting the tags array and then selecting distinct values
+    try:
+        from sqlalchemy.sql.expression import func
+        
+        # Execute raw SQL for this complex operation
+        result = db.session.execute(
+            sa.text("""
+                SELECT DISTINCT unnest(tags) as tag
+                FROM document
+                WHERE tags IS NOT NULL
+                ORDER BY tag
+            """)
+        )
+        
+        tags = [row[0] for row in result]
+        
+        return jsonify({
+            'success': True,
+            'tags': tags
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @document_routes.route('/api/documents/<int:document_id>')
 def get_document(document_id):
@@ -89,7 +112,13 @@ def get_document(document_id):
     """
     document = Document.query.get_or_404(document_id)
     
-    # Format document data
+    # Get processing status
+    processing_status = None
+    queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).first()
+    if queue_entry:
+        processing_status = queue_entry.status
+    
+    # Format the response
     doc_data = {
         'id': document.id,
         'title': document.title or 'Untitled Document',
@@ -99,8 +128,9 @@ def get_document(document_id):
         'publication_date': document.publication_date.isoformat() if document.publication_date else None,
         'upload_date': document.upload_date.isoformat(),
         'processed': document.processed,
-        'tags': document.tags or [],
-        'citation_apa': document.citation_apa
+        'tags': document.tags,
+        'citation_apa': document.citation_apa,
+        'processing_status': processing_status
     }
     
     return jsonify(doc_data)

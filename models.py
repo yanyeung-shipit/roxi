@@ -1,7 +1,9 @@
 import datetime
+
+import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ARRAY, JSON
+
 from app import db
-from sqlalchemy import JSON
-from sqlalchemy.dialects.postgresql import ARRAY
 
 class Document(db.Model):
     """Model for storing document information"""
@@ -19,7 +21,8 @@ class Document(db.Model):
     full_text = db.Column(db.Text)
     
     def __repr__(self):
-        return f"<Document id={self.id} title='{self.title or 'Untitled'}'>"
+        return f"<Document {self.id}: {self.title}>"
+
 
 class TextChunk(db.Model):
     """Model for storing text chunks from documents"""
@@ -31,7 +34,8 @@ class TextChunk(db.Model):
     document = db.relationship('Document', backref=db.backref('chunks', lazy=True))
     
     def __repr__(self):
-        return f"<TextChunk id={self.id} document_id={self.document_id} index={self.chunk_index}>"
+        return f"<TextChunk {self.id}: Document {self.document_id}, Page {self.page_num}>"
+
 
 class VectorEmbedding(db.Model):
     """Model for storing vector embeddings of text chunks"""
@@ -41,7 +45,8 @@ class VectorEmbedding(db.Model):
     chunk = db.relationship('TextChunk', backref=db.backref('embedding', uselist=False))
     
     def __repr__(self):
-        return f"<VectorEmbedding id={self.id} chunk_id={self.chunk_id}>"
+        return f"<VectorEmbedding {self.id}: Chunk {self.chunk_id}>"
+
 
 class ProcessingQueue(db.Model):
     """Model for tracking document processing queue"""
@@ -55,7 +60,8 @@ class ProcessingQueue(db.Model):
     error_message = db.Column(db.Text)
     
     def __repr__(self):
-        return f"<ProcessingQueue id={self.id} document_id={self.document_id} status={self.status}>"
+        return f"<ProcessingQueue {self.id}: Document {self.document_id}, Status {self.status}>"
+
 
 class QueryHistory(db.Model):
     """Model for storing user query history"""
@@ -67,7 +73,8 @@ class QueryHistory(db.Model):
     conversation_id = db.Column(db.String(50))
     
     def __repr__(self):
-        return f"<QueryHistory id={self.id} conversation_id={self.conversation_id}>"
+        return f"<QueryHistory {self.id}: {self.query_text[:30]}...>"
+
 
 class SystemMetrics(db.Model):
     """Model for storing system performance metrics"""
@@ -79,4 +86,4 @@ class SystemMetrics(db.Model):
     chunks_pending = db.Column(db.Integer)
     
     def __repr__(self):
-        return f"<SystemMetrics id={self.id} timestamp={self.timestamp}>"
+        return f"<SystemMetrics {self.id}: {self.timestamp}>"

@@ -8,45 +8,44 @@ from sqlalchemy.orm import DeclarativeBase
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Define base model class
+# Create SQLAlchemy models base class
 class Base(DeclarativeBase):
     pass
 
-# Initialize database
+# Initialize SQLAlchemy
 db = SQLAlchemy(model_class=Base)
 
-# Create the Flask application
+# Create Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "temporary_development_key")
 
-# Configure database
+# Configure app
+app.secret_key = os.environ.get("SESSION_SECRET", "dev_secret_key")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
 }
+app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max upload size
 
-# Initialize the app with the database extension
+# Ensure upload directory exists
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+# Initialize SQLAlchemy with app
 db.init_app(app)
 
-# Configure Celery
-app.config["CELERY_BROKER_URL"] = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-app.config["CELERY_RESULT_BACKEND"] = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-
-# Import Celery config
+# Import celery configuration
 from celery_config import setup_celery
 celery = setup_celery(app)
 
-# Register blueprints
+# Import and register blueprints
 from routes import main_routes, document_routes, monitoring_routes
+app.register_blueprint(main_routes)
+app.register_blueprint(document_routes)
+app.register_blueprint(monitoring_routes)
 
-app.register_blueprint(main_routes.main_routes)
-app.register_blueprint(document_routes.document_routes)
-app.register_blueprint(monitoring_routes.monitoring_routes)
-
-# Create database tables within app context (if they don't exist)
+# Create database tables
 with app.app_context():
-    # Import models here to avoid circular imports
     import models
     db.create_all()
-    logger.info("Database tables created if they didn't exist")
+    logger.info("Database tables created")

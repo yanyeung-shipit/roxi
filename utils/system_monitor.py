@@ -1,7 +1,9 @@
-import psutil
 import logging
-import datetime
-from models import SystemMetrics, ProcessingQueue, TextChunk, VectorEmbedding, db
+import psutil
+from datetime import datetime, timedelta
+
+from app import db
+from models import SystemMetrics, TextChunk, VectorEmbedding, ProcessingQueue
 
 logger = logging.getLogger(__name__)
 
@@ -13,33 +15,29 @@ def get_system_metrics():
         dict: Dictionary containing system metrics
     """
     try:
-        # CPU and memory usage
-        cpu_usage = psutil.cpu_percent(interval=0.1)
+        # Get CPU and memory usage
+        cpu_usage = psutil.cpu_percent(interval=0.5)
         memory_usage = psutil.virtual_memory().percent
         
-        # Count processed and pending chunks
-        chunks_processed = db.session.query(VectorEmbedding).count()
-        
-        # Calculate number of chunks without embeddings
-        total_chunks = db.session.query(TextChunk).count()
-        chunks_pending = total_chunks - chunks_processed
+        # Get chunk processing stats
+        chunks_processed = VectorEmbedding.query.count()
+        chunks_pending = TextChunk.query.count() - chunks_processed
         
         return {
             'cpu_usage': cpu_usage,
             'memory_usage': memory_usage,
             'chunks_processed': chunks_processed,
             'chunks_pending': chunks_pending,
-            'timestamp': datetime.datetime.utcnow()
+            'timestamp': datetime.utcnow()
         }
-    
     except Exception as e:
-        logger.error(f"Error getting system metrics: {str(e)}")
+        logger.exception(f"Error getting system metrics: {str(e)}")
         return {
-            'cpu_usage': 0,
-            'memory_usage': 0,
+            'cpu_usage': 0.0,
+            'memory_usage': 0.0,
             'chunks_processed': 0,
             'chunks_pending': 0,
-            'timestamp': datetime.datetime.utcnow()
+            'timestamp': datetime.utcnow()
         }
 
 def update_system_metrics():
@@ -50,9 +48,11 @@ def update_system_metrics():
         bool: True if successful, False otherwise
     """
     try:
+        # Get current metrics
         metrics = get_system_metrics()
         
-        system_metrics = SystemMetrics(
+        # Create new metrics record
+        db_metrics = SystemMetrics(
             cpu_usage=metrics['cpu_usage'],
             memory_usage=metrics['memory_usage'],
             chunks_processed=metrics['chunks_processed'],
@@ -60,37 +60,32 @@ def update_system_metrics():
             timestamp=metrics['timestamp']
         )
         
-        db.session.add(system_metrics)
+        # Add to database and commit
+        db.session.add(db_metrics)
         db.session.commit()
         
-        # Clean up old metrics
+        # Clean up old metrics (keep only last 24 hours)
         cleanup_old_metrics()
         
         return True
-    
     except Exception as e:
-        logger.error(f"Error updating system metrics: {str(e)}")
+        logger.exception(f"Error updating system metrics: {str(e)}")
+        db.session.rollback()
         return False
 
 def cleanup_old_metrics():
     """Remove old system metrics to prevent database growth"""
     try:
-        # Keep metrics from the last 7 days
-        cutoff_date = datetime.datetime.utcnow() - datetime.timedelta(days=7)
+        # Keep only the last 24 hours of metrics
+        cutoff_time = datetime.utcnow() - timedelta(hours=24)
         
         # Delete old metrics
-        deleted = db.session.query(SystemMetrics).filter(
-            SystemMetrics.timestamp < cutoff_date
-        ).delete()
-        
+        result = SystemMetrics.query.filter(SystemMetrics.timestamp < cutoff_time).delete()
         db.session.commit()
         
-        if deleted:
-            logger.info(f"Cleaned up {deleted} old system metrics")
-        
-        return True
-    
+        if result > 0:
+            logger.info(f"Cleaned up {result} old system metrics records")
+            
     except Exception as e:
-        logger.error(f"Error cleaning up old metrics: {str(e)}")
+        logger.exception(f"Error cleaning up old metrics: {str(e)}")
         db.session.rollback()
-        return False

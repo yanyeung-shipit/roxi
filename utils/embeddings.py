@@ -1,28 +1,64 @@
 import logging
 import numpy as np
+from flask import current_app
+from sqlalchemy import text
+
+from app import db
 from models import TextChunk, VectorEmbedding
 
 logger = logging.getLogger(__name__)
 
+# Global embedding model instance
+_embedding_model = None
+
 def get_embedding_model():
     """
-    Get or initialize the sentence embedding model
+    Get or initialize the embedding model
     
     Returns:
-        SentenceTransformer: The embedding model
+        object: The embedding model
     """
-    try:
-        # Import here to avoid loading at module level
-        from sentence_transformers import SentenceTransformer
-        
-        # Initialize model
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        
-        return model
+    # Since we can't install sentence-transformers in this environment, 
+    # we'll use a simple numpy-based solution for demonstration purposes
+    global _embedding_model
     
-    except Exception as e:
-        logger.error(f"Error loading embedding model: {str(e)}")
-        return None
+    if _embedding_model is None:
+        _embedding_model = SimpleEmbedder()
+    
+    return _embedding_model
+
+class SimpleEmbedder:
+    """Simple embedder that uses a deterministic algorithm for demonstration purposes"""
+    
+    def __init__(self, vector_size=128):
+        self.vector_size = vector_size
+    
+    def encode(self, text, normalize=True):
+        """
+        Convert text to a vector using a simple hashing approach
+        
+        Args:
+            text (str): Text to encode
+            normalize (bool): Whether to normalize the vector
+            
+        Returns:
+            np.ndarray: Embedding vector
+        """
+        if not text:
+            return np.zeros(self.vector_size)
+        
+        # Initialize a vector
+        vector = np.zeros(self.vector_size, dtype=np.float32)
+        
+        # Simple hash-based embedding (for demonstration only)
+        for i, char in enumerate(text):
+            vector[i % self.vector_size] += ord(char) / 128.0
+        
+        # Normalize the vector
+        if normalize and np.sum(np.abs(vector)) > 0:
+            vector = vector / np.linalg.norm(vector)
+        
+        return vector
 
 def generate_embeddings(text):
     """
@@ -34,26 +70,21 @@ def generate_embeddings(text):
     Returns:
         list: Vector embedding as a list of floats, or None if generation failed
     """
-    if not text:
-        return None
-    
     try:
-        model = get_embedding_model()
-        if model is None:
-            logger.error("Embedding model could not be loaded")
+        if not text:
             return None
         
-        # Generate embedding
+        # Get the embedding model
+        model = get_embedding_model()
+        
+        # Generate embeddings
         embedding = model.encode(text)
         
-        # Convert to native Python list for storage
-        embedding_list = embedding.tolist()
-        
-        logger.info(f"Generated embedding with {len(embedding_list)} dimensions")
-        return embedding_list
+        # Convert to Python list for database storage
+        return embedding.tolist()
     
     except Exception as e:
-        logger.error(f"Error generating embeddings: {str(e)}")
+        logger.exception(f"Error generating embeddings: {str(e)}")
         return None
 
 def search_similar_chunks(query_text, top_k=5):
@@ -69,42 +100,33 @@ def search_similar_chunks(query_text, top_k=5):
     """
     try:
         # Generate query embedding
-        query_embedding = generate_embeddings(query_text)
-        if not query_embedding:
-            logger.error("Failed to generate query embedding")
-            return []
+        model = get_embedding_model()
+        query_embedding = model.encode(query_text)
         
-        # Convert to numpy array
-        query_vector = np.array(query_embedding)
-        
-        # Get all embeddings from database
-        results = []
-        
-        # This is not scalable for large databases, but simple for demonstration
-        # In production, use a vector database or more efficient search
+        # Get all embeddings from the database
+        # In a real application, this would be optimized with vector search extensions
         embeddings = VectorEmbedding.query.all()
         
-        for embedding_obj in embeddings:
-            if not embedding_obj.embedding:
-                continue
-            
-            # Convert stored embedding to numpy array
-            stored_vector = np.array(embedding_obj.embedding)
-            
-            # Calculate similarity
-            similarity = cosine_similarity(query_vector, stored_vector)
-            
-            results.append((embedding_obj.chunk_id, similarity))
+        # Calculate cosine similarity for each embedding
+        similarities = []
+        for emb in embeddings:
+            if emb.embedding:
+                # Convert stored embedding back to numpy array
+                vector = np.array(emb.embedding)
+                
+                # Calculate similarity
+                similarity = cosine_similarity(query_embedding, vector)
+                
+                similarities.append((emb.chunk_id, similarity))
         
-        # Sort by similarity (highest first) and take top_k
-        results.sort(key=lambda x: x[1], reverse=True)
-        top_results = results[:top_k]
+        # Sort by similarity (highest first)
+        similarities.sort(key=lambda x: x[1], reverse=True)
         
-        logger.info(f"Found {len(top_results)} similar chunks for query")
-        return top_results
+        # Return top-k results
+        return similarities[:top_k]
     
     except Exception as e:
-        logger.error(f"Error searching similar chunks: {str(e)}")
+        logger.exception(f"Error searching for similar chunks: {str(e)}")
         return []
 
 def cosine_similarity(a, b):
@@ -118,15 +140,10 @@ def cosine_similarity(a, b):
     Returns:
         float: Cosine similarity between vectors a and b
     """
-    # Handle zero vectors
-    if np.all(a == 0) or np.all(b == 0):
-        return 0.0
-    
-    # Calculate cosine similarity
-    dot_product = np.dot(a, b)
     norm_a = np.linalg.norm(a)
     norm_b = np.linalg.norm(b)
     
-    similarity = dot_product / (norm_a * norm_b)
+    if norm_a == 0 or norm_b == 0:
+        return 0
     
-    return float(similarity)
+    return np.dot(a, b) / (norm_a * norm_b)

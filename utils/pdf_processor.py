@@ -1,8 +1,9 @@
 import os
-import tempfile
+import re
 import logging
 from werkzeug.utils import secure_filename
 import PyPDF2
+from flask import current_app
 
 logger = logging.getLogger(__name__)
 
@@ -17,26 +18,18 @@ def extract_text_from_pdf(pdf_path):
         str: Extracted text from the PDF, or None if extraction failed
     """
     try:
-        logger.info(f"Extracting text from PDF: {pdf_path}")
-        
         text = ""
-        
         with open(pdf_path, 'rb') as pdf_file:
             pdf_reader = PyPDF2.PdfReader(pdf_file)
             
             # Extract text from each page
             for page_num in range(len(pdf_reader.pages)):
                 page = pdf_reader.pages[page_num]
-                page_text = page.extract_text()
-                
-                if page_text:
-                    text += page_text + "\n\n"
+                text += page.extract_text() + "\n\n"
         
-        logger.info(f"Successfully extracted {len(text)} characters from PDF")
         return text
-    
     except Exception as e:
-        logger.error(f"Error extracting text from PDF: {str(e)}")
+        logger.exception(f"Error extracting text from PDF: {pdf_path}")
         return None
 
 def chunk_text(text, chunk_size=1000, overlap=200):
@@ -54,63 +47,50 @@ def chunk_text(text, chunk_size=1000, overlap=200):
     if not text:
         return []
     
+    # Clean the text by removing excessive whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
     chunks = []
     start = 0
     
     while start < len(text):
-        # Get chunk of target size or remainder of text
+        # Calculate end position with potential overlap
         end = min(start + chunk_size, len(text))
         
-        # If not at the end of text, try to find a natural break point
+        # If we're not at the end of the text, try to find a sentence boundary
         if end < len(text):
-            # Look for paragraph, then sentence, then word boundary
-            paragraph_break = text.rfind('\n\n', start, end)
-            sentence_break = text.rfind('. ', start, end)
-            space_break = text.rfind(' ', start, end)
-            
-            if paragraph_break != -1 and paragraph_break > start + chunk_size * 0.7:
-                end = paragraph_break + 2  # Include the newlines
-            elif sentence_break != -1 and sentence_break > start + chunk_size * 0.7:
-                end = sentence_break + 2  # Include the period and space
-            elif space_break != -1:
-                end = space_break + 1  # Include the space
+            # Look for sentence boundaries (.!?) followed by a space and capital letter
+            sentence_match = re.search(r'[.!?]\s+[A-Z]', text[end-100:end+100])
+            if sentence_match:
+                # Adjust the end to the sentence boundary
+                end = end - 100 + sentence_match.start() + 1  # Include the punctuation
         
-        # Add the chunk to the list
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
+        # Add the chunk to our list
+        chunks.append(text[start:end])
         
-        # Move to the next chunk, accounting for overlap
-        start = max(start, end - overlap)
+        # Move start position for next chunk, considering overlap
+        start = end - overlap if end < len(text) else end
     
-    logger.info(f"Split text into {len(chunks)} chunks")
     return chunks
 
-def save_uploaded_pdf(uploaded_file):
+def save_uploaded_pdf(uploaded_file, filename=None):
     """
     Save an uploaded PDF file to a temporary location
     
     Args:
         uploaded_file: The uploaded file object from Flask
+        filename (str, optional): Custom filename to use
         
     Returns:
         str: Path to the saved PDF file
     """
-    try:
-        # Create temporary directory if it doesn't exist
-        upload_dir = os.path.join(tempfile.gettempdir(), 'roxi_uploads')
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # Secure filename and create full path
+    if filename is None:
         filename = secure_filename(uploaded_file.filename)
-        file_path = os.path.join(upload_dir, filename)
-        
-        # Save the file
-        uploaded_file.save(file_path)
-        logger.info(f"Saved uploaded PDF to {file_path}")
-        
-        return file_path
     
-    except Exception as e:
-        logger.error(f"Error saving uploaded PDF: {str(e)}")
-        raise
+    upload_folder = current_app.config["UPLOAD_FOLDER"]
+    file_path = os.path.join(upload_folder, filename)
+    
+    uploaded_file.save(file_path)
+    logger.info(f"PDF saved to: {file_path}")
+    
+    return file_path

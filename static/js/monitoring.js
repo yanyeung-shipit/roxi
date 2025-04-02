@@ -1,154 +1,123 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize the monitoring dashboard
-    initMonitoringDashboard();
-});
-
 /**
  * Initialize the monitoring dashboard
  */
 function initMonitoringDashboard() {
     // Charts
-    let cpuChart = null;
-    let memoryChart = null;
+    let resourceChart = null;
     let chunksChart = null;
     
-    // System stats elements
-    const totalDocumentsElement = document.getElementById('total-documents');
-    const processedDocumentsElement = document.getElementById('processed-documents');
-    const pendingDocumentsElement = document.getElementById('pending-documents');
-    const queuePendingElement = document.getElementById('queue-pending');
-    const queueProcessingElement = document.getElementById('queue-processing');
-    const queueCompletedElement = document.getElementById('queue-completed');
-    const queueFailedElement = document.getElementById('queue-failed');
-    
-    // CPU/Memory charts
-    const cpuChartElement = document.getElementById('cpu-chart');
-    const memoryChartElement = document.getElementById('memory-chart');
-    
-    // Chunks chart
-    const chunksChartElement = document.getElementById('chunks-chart');
-    
-    // Processing queue table
-    const queueTableBody = document.getElementById('queue-table-body');
-    
-    // Check if we're on the monitoring page
-    if (!cpuChartElement || !memoryChartElement || !chunksChartElement) {
-        return;
-    }
-    
-    // Initialize charts
+    // Initialize everything
     initCharts();
-    
-    // Initial data load
     loadSystemStats();
     loadMetricsHistory();
     loadProcessingQueue();
     
-    // Set up auto-refresh
-    const refreshInterval = 10000; // 10 seconds
+    // Set up periodic refresh
     setInterval(() => {
         loadSystemStats();
         loadMetricsHistory();
         loadProcessingQueue();
-    }, refreshInterval);
+        
+        // Update last update time
+        document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+    }, 30000); // Update every 30 seconds
+    
+    // Initial last update time
+    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
     
     /**
      * Initialize the charts
      */
     function initCharts() {
-        // CPU usage chart
-        cpuChart = new Chart(cpuChartElement, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'CPU Usage (%)',
-                    data: [],
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 2,
-                    tension: 0.2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'CPU Usage (%)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Memory usage chart
-        memoryChart = new Chart(memoryChartElement, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Memory Usage (%)',
-                    data: [],
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderWidth: 2,
-                    tension: 0.2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Memory Usage (%)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Chunks processed/pending chart
-        chunksChart = new Chart(chunksChartElement, {
+        // Resource chart
+        const resourceCtx = document.getElementById('resourceChart').getContext('2d');
+        resourceChart = new Chart(resourceCtx, {
             type: 'line',
             data: {
                 labels: [],
                 datasets: [
                     {
-                        label: 'Chunks Processed',
+                        label: 'CPU Usage',
                         data: [],
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
                         borderWidth: 2,
-                        tension: 0.2
+                        tension: 0.3,
+                        fill: true
                     },
                     {
-                        label: 'Chunks Pending',
+                        label: 'Memory Usage',
                         data: [],
-                        backgroundColor: 'rgba(255, 159, 64, 0.2)',
-                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderColor: 'rgba(13, 202, 240, 1)',
+                        backgroundColor: 'rgba(13, 202, 240, 0.1)',
                         borderWidth: 2,
-                        tension: 0.2
+                        tension: 0.3,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Percentage (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Chunks chart
+        const chunksCtx = document.getElementById('chunksChart').getContext('2d');
+        chunksChart = new Chart(chunksCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Processed Chunks',
+                        data: [],
+                        borderColor: 'rgba(25, 135, 84, 1)',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: 'Pending Chunks',
+                        data: [],
+                        borderColor: 'rgba(255, 193, 7, 1)',
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
                     }
                 ]
             },
@@ -169,6 +138,15 @@ function initMonitoringDashboard() {
                             text: 'Time'
                         }
                     }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
                 }
             }
         });
@@ -181,27 +159,10 @@ function initMonitoringDashboard() {
         fetch('/monitoring/stats')
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    console.error('Error loading system stats:', data.error);
-                    return;
-                }
-                
-                // Update document stats
-                if (totalDocumentsElement) totalDocumentsElement.textContent = data.documents.total;
-                if (processedDocumentsElement) processedDocumentsElement.textContent = data.documents.processed;
-                if (pendingDocumentsElement) pendingDocumentsElement.textContent = data.documents.pending;
-                
-                // Update queue stats
-                if (queuePendingElement) queuePendingElement.textContent = data.queue.pending;
-                if (queueProcessingElement) queueProcessingElement.textContent = data.queue.processing;
-                if (queueCompletedElement) queueCompletedElement.textContent = data.queue.completed;
-                if (queueFailedElement) queueFailedElement.textContent = data.queue.failed;
-                
-                // Update progress bars
                 updateProgressBars(data);
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error loading system stats:', error);
             });
     }
     
@@ -212,15 +173,10 @@ function initMonitoringDashboard() {
         fetch('/monitoring/history')
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    console.error('Error loading metrics history:', data.error);
-                    return;
-                }
-                
-                updateCharts(data.history);
+                updateCharts(data);
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error loading metrics history:', error);
             });
     }
     
@@ -228,20 +184,13 @@ function initMonitoringDashboard() {
      * Load processing queue data
      */
     function loadProcessingQueue() {
-        if (!queueTableBody) return;
-        
         fetch('/monitoring/queue')
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    console.error('Error loading processing queue:', data.error);
-                    return;
-                }
-                
-                updateQueueTable(data.queue);
+                updateQueueTable(data);
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error loading processing queue:', error);
             });
     }
     
@@ -251,158 +200,125 @@ function initMonitoringDashboard() {
     function updateCharts(history) {
         if (!history || history.length === 0) return;
         
-        // Format labels (time)
+        // Format timestamps for chart labels
         const labels = history.map(item => {
             const date = new Date(item.timestamp);
             return date.toLocaleTimeString();
         });
         
-        // Get data for each chart
-        const cpuData = history.map(item => item.cpu_usage);
-        const memoryData = history.map(item => item.memory_usage);
-        const chunksProcessedData = history.map(item => item.chunks_processed);
-        const chunksPendingData = history.map(item => item.chunks_pending);
-        
-        // Update CPU chart
-        cpuChart.data.labels = labels;
-        cpuChart.data.datasets[0].data = cpuData;
-        cpuChart.update();
-        
-        // Update memory chart
-        memoryChart.data.labels = labels;
-        memoryChart.data.datasets[0].data = memoryData;
-        memoryChart.update();
+        // Update resource chart
+        resourceChart.data.labels = labels;
+        resourceChart.data.datasets[0].data = history.map(item => item.cpu_usage);
+        resourceChart.data.datasets[1].data = history.map(item => item.memory_usage);
+        resourceChart.update();
         
         // Update chunks chart
         chunksChart.data.labels = labels;
-        chunksChart.data.datasets[0].data = chunksProcessedData;
-        chunksChart.data.datasets[1].data = chunksPendingData;
+        chunksChart.data.datasets[0].data = history.map(item => item.chunks_processed);
+        chunksChart.data.datasets[1].data = history.map(item => item.chunks_pending);
         chunksChart.update();
+        
+        // Update current metrics
+        if (history.length > 0) {
+            const latest = history[history.length - 1];
+            
+            document.getElementById('currentCPU').textContent = `${latest.cpu_usage.toFixed(1)}%`;
+            document.getElementById('currentMemory').textContent = `${latest.memory_usage.toFixed(1)}%`;
+            
+            document.getElementById('cpuProgressBar').style.width = `${latest.cpu_usage}%`;
+            document.getElementById('memoryProgressBar').style.width = `${latest.memory_usage}%`;
+        }
     }
     
     /**
      * Update the processing queue table
      */
     function updateQueueTable(queue) {
-        if (!queueTableBody) return;
+        // Update queue counts
+        document.getElementById('queueTotal').textContent = queue.total;
+        document.getElementById('pendingCount').textContent = `Pending: ${queue.pending}`;
+        document.getElementById('processingCount').textContent = `Processing: ${queue.processing}`;
+        document.getElementById('completedCount').textContent = `Completed: ${queue.completed}`;
+        document.getElementById('failedCount').textContent = `Failed: ${queue.failed}`;
         
-        // Clear the table
-        queueTableBody.innerHTML = '';
+        // Update queue table
+        const tableBody = document.getElementById('queueTableBody');
         
-        if (!queue || queue.length === 0) {
-            queueTableBody.innerHTML = '<tr><td colspan="5" class="text-center">No documents in the processing queue</td></tr>';
-            return;
-        }
+        if (!tableBody) return;
         
-        // Sort queue entries by status and time
-        queue.sort((a, b) => {
-            // First by status priority
-            const statusPriority = {
-                'processing': 1,
-                'pending': 2,
-                'completed': 3,
-                'failed': 4
-            };
-            
-            const priorityDiff = statusPriority[a.status] - statusPriority[b.status];
-            if (priorityDiff !== 0) return priorityDiff;
-            
-            // Then by timestamp
-            return new Date(b.queued_at) - new Date(a.queued_at);
-        });
+        // Clear existing rows
+        tableBody.innerHTML = '';
         
-        // Add queue entries to the table
-        queue.forEach(entry => {
-            const tr = document.createElement('tr');
-            
-            // Status class
-            let statusClass = '';
-            switch (entry.status) {
-                case 'pending': statusClass = 'bg-warning text-dark'; break;
-                case 'processing': statusClass = 'bg-info text-white'; break;
-                case 'completed': statusClass = 'bg-success text-white'; break;
-                case 'failed': statusClass = 'bg-danger text-white'; break;
-            }
-            
-            // Format timestamps
-            const queuedAt = new Date(entry.queued_at).toLocaleString();
-            const startedAt = entry.started_at ? new Date(entry.started_at).toLocaleString() : '-';
-            const completedAt = entry.completed_at ? new Date(entry.completed_at).toLocaleString() : '-';
-            
-            tr.innerHTML = `
-                <td>${entry.document_id}</td>
-                <td>${entry.document_title}</td>
-                <td><span class="badge ${statusClass}">${entry.status}</span></td>
-                <td class="text-nowrap">
-                    Queued: ${queuedAt}<br>
-                    Started: ${startedAt}<br>
-                    ${entry.completed_at ? `Completed: ${completedAt}` : ''}
-                </td>
-                <td>${entry.error || '-'}</td>
+        // Add new rows
+        if (queue.recent_queue && queue.recent_queue.length > 0) {
+            queue.recent_queue.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // Determine status badge class
+                let statusBadgeClass = '';
+                switch (item.status) {
+                    case 'pending': statusBadgeClass = 'bg-warning'; break;
+                    case 'processing': statusBadgeClass = 'bg-primary'; break;
+                    case 'completed': statusBadgeClass = 'bg-success'; break;
+                    case 'failed': statusBadgeClass = 'bg-danger'; break;
+                    default: statusBadgeClass = 'bg-secondary';
+                }
+                
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${escapeHtml(item.document_title)}</td>
+                    <td><span class="badge ${statusBadgeClass}">${item.status}</span></td>
+                    <td>${formatDateTime(item.queued_at)}</td>
+                    <td>${item.started_at ? formatDateTime(item.started_at) : '-'}</td>
+                    <td>${item.completed_at ? formatDateTime(item.completed_at) : '-'}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        } else {
+            // No queue entries
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td colspan="6" class="text-center text-muted">No documents in queue</td>
             `;
-            
-            queueTableBody.appendChild(tr);
-        });
+            tableBody.appendChild(row);
+        }
     }
     
     /**
      * Update progress bars with current data
      */
     function updateProgressBars(data) {
-        // Document processing progress
-        const docProgressBar = document.getElementById('document-progress');
-        if (docProgressBar && data.documents.total > 0) {
-            const processedPercentage = Math.round((data.documents.processed / data.documents.total) * 100);
-            docProgressBar.style.width = `${processedPercentage}%`;
-            docProgressBar.setAttribute('aria-valuenow', processedPercentage);
-            docProgressBar.textContent = `${processedPercentage}%`;
+        // Documents stats
+        document.getElementById('totalDocuments').textContent = data.total_documents;
+        document.getElementById('processingProgressBar').style.width = `${data.processing_percentage}%`;
+        document.getElementById('processingStats').textContent = 
+            `${data.processed_documents} of ${data.total_documents} documents processed (${data.processing_percentage}%)`;
+        
+        // Chunks and embeddings stats
+        document.getElementById('totalChunks').textContent = data.total_chunks;
+        document.getElementById('embeddingsProgressBar').style.width = `${data.embeddings_percentage}%`;
+        document.getElementById('embeddingStats').textContent = 
+            `${data.total_embeddings} of ${data.total_chunks} chunks embedded (${data.embeddings_percentage}%)`;
+        
+        // Average processing time
+        const avgTimeElement = document.getElementById('avgProcessingTime');
+        if (data.avg_processing_time_seconds) {
+            const minutes = Math.floor(data.avg_processing_time_seconds / 60);
+            const seconds = Math.floor(data.avg_processing_time_seconds % 60);
+            avgTimeElement.textContent = `${minutes}m ${seconds}s`;
+        } else {
+            avgTimeElement.textContent = 'N/A';
         }
+    }
+    
+    /**
+     * Format a date and time for display
+     */
+    function formatDateTime(dateTimeString) {
+        if (!dateTimeString) return '-';
         
-        // Queue progress
-        const queueTotal = data.queue.pending + data.queue.processing + data.queue.completed + data.queue.failed;
-        
-        // Pending documents progress
-        const pendingProgressBar = document.getElementById('pending-progress');
-        if (pendingProgressBar && queueTotal > 0) {
-            const pendingPercentage = Math.round((data.queue.pending / queueTotal) * 100);
-            pendingProgressBar.style.width = `${pendingPercentage}%`;
-            pendingProgressBar.setAttribute('aria-valuenow', pendingPercentage);
-        }
-        
-        // Processing documents progress
-        const processingProgressBar = document.getElementById('processing-progress');
-        if (processingProgressBar && queueTotal > 0) {
-            const processingPercentage = Math.round((data.queue.processing / queueTotal) * 100);
-            processingProgressBar.style.width = `${processingPercentage}%`;
-            processingProgressBar.setAttribute('aria-valuenow', processingPercentage);
-        }
-        
-        // Completed documents progress
-        const completedProgressBar = document.getElementById('completed-progress');
-        if (completedProgressBar && queueTotal > 0) {
-            const completedPercentage = Math.round((data.queue.completed / queueTotal) * 100);
-            completedProgressBar.style.width = `${completedPercentage}%`;
-            completedProgressBar.setAttribute('aria-valuenow', completedPercentage);
-        }
-        
-        // Failed documents progress
-        const failedProgressBar = document.getElementById('failed-progress');
-        if (failedProgressBar && queueTotal > 0) {
-            const failedPercentage = Math.round((data.queue.failed / queueTotal) * 100);
-            failedProgressBar.style.width = `${failedPercentage}%`;
-            failedProgressBar.setAttribute('aria-valuenow', failedPercentage);
-        }
-        
-        // Update current metrics values
-        const currentCpu = document.getElementById('current-cpu');
-        const currentMemory = document.getElementById('current-memory');
-        
-        if (currentCpu && data.current_metrics) {
-            currentCpu.textContent = `${Math.round(data.current_metrics.cpu_usage)}%`;
-        }
-        
-        if (currentMemory && data.current_metrics) {
-            currentMemory.textContent = `${Math.round(data.current_metrics.memory_usage)}%`;
-        }
+        const date = new Date(dateTimeString);
+        return date.toLocaleString();
     }
 }

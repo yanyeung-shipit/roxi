@@ -1,12 +1,12 @@
 import re
 import logging
-import datetime
 import requests
 
 logger = logging.getLogger(__name__)
 
-# DOI pattern - relaxed to catch more potential DOIs
-DOI_PATTERN = r'(?:doi:|https?://doi.org/|DOI\s*[:=]\s*)(10\.\d+(?:\.\d+)*[:/][^/\s]+)'
+# Regular expression for DOI pattern
+DOI_REGEX = r'(10\.\d{4,9}/[-._;()/:A-Z0-9]+)'
+DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
 
 def extract_doi_from_text(text):
     """
@@ -21,16 +21,16 @@ def extract_doi_from_text(text):
     if not text:
         return None
     
-    # Look for DOI in text
-    match = re.search(DOI_PATTERN, text, re.IGNORECASE)
+    # Try to find DOI with exact case first (more strict)
+    match = re.search(DOI_REGEX, text, re.IGNORECASE)
     if match:
-        doi = match.group(1)
-        # Clean up the DOI
-        doi = doi.strip().rstrip('.')
-        logger.info(f"Extracted DOI: {doi}")
-        return doi
+        return match.group(1)
     
-    logger.info("No DOI found in text")
+    # Try with a more permissive pattern
+    match = re.search(DOI_REGEX_CASE_INSENSITIVE, text, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    
     return None
 
 def validate_doi_with_crossref(doi):
@@ -47,67 +47,24 @@ def validate_doi_with_crossref(doi):
         return None
     
     try:
-        # Crossref API URL
+        # API endpoint for DOI metadata
         url = f"https://api.crossref.org/works/{doi}"
         
-        # Make request with user agent (good practice for Crossref API)
-        headers = {
-            "User-Agent": "ROXI/0.1 (Research Organization and eXtraction Interface; mailto:admin@example.com)"
-        }
+        # Send request to Crossref API
+        response = requests.get(url, timeout=10, headers={
+            'User-Agent': 'ROXI/0.1 (mailto:contact@example.com)'
+        })
         
-        response = requests.get(url, headers=headers)
-        
+        # Check if request was successful
         if response.status_code == 200:
             data = response.json()
-            
-            # Extract relevant metadata
-            metadata = {}
-            
-            if 'message' in data:
-                message = data['message']
-                
-                # Title
-                if 'title' in message and message['title']:
-                    metadata['title'] = message['title'][0]
-                
-                # Authors
-                if 'author' in message:
-                    authors = []
-                    for author in message['author']:
-                        if 'family' in author and 'given' in author:
-                            authors.append(f"{author['family']}, {author['given']}")
-                    metadata['authors'] = "; ".join(authors)
-                
-                # Journal
-                if 'container-title' in message and message['container-title']:
-                    metadata['journal'] = message['container-title'][0]
-                
-                # Publication date
-                if 'published' in message and 'date-parts' in message['published']:
-                    date_parts = message['published']['date-parts'][0]
-                    if len(date_parts) >= 1:
-                        year = date_parts[0]
-                        month = date_parts[1] if len(date_parts) >= 2 else 1
-                        day = date_parts[2] if len(date_parts) >= 3 else 1
-                        
-                        try:
-                            metadata['publication_date'] = datetime.datetime(year, month, day)
-                        except ValueError:
-                            # Handle invalid dates
-                            metadata['publication_date'] = None
-                
-                # Store the DOI
-                metadata['doi'] = doi
-                
-                logger.info(f"Successfully validated DOI with Crossref: {doi}")
-                return metadata
-            
+            return data.get('message', {})
         else:
-            logger.warning(f"Failed to validate DOI with Crossref (status {response.status_code}): {doi}")
+            logger.warning(f"DOI validation failed with status code {response.status_code}: {doi}")
             return None
-    
+            
     except Exception as e:
-        logger.error(f"Error validating DOI with Crossref: {str(e)}")
+        logger.exception(f"Error validating DOI: {doi}")
         return None
 
 def extract_and_validate_doi(text):
@@ -120,7 +77,11 @@ def extract_and_validate_doi(text):
     Returns:
         dict: Metadata from Crossref, or None if extraction or validation failed
     """
+    # Extract DOI from text
     doi = extract_doi_from_text(text)
-    if doi:
-        return validate_doi_with_crossref(doi)
-    return None
+    
+    if not doi:
+        return None
+    
+    # Validate DOI with Crossref
+    return validate_doi_with_crossref(doi)

@@ -1,16 +1,19 @@
 from flask import Blueprint, render_template, jsonify
-from models import Document, ProcessingQueue, SystemMetrics, TextChunk, VectorEmbedding, db
-from sqlalchemy import func
-import datetime
+from datetime import datetime, timedelta
+import sqlalchemy as sa
 
-monitoring_routes = Blueprint('monitoring_routes', __name__)
+from app import db
+from models import SystemMetrics, ProcessingQueue, Document, TextChunk, VectorEmbedding
 
-@monitoring_routes.route('/monitoring')
+# Create blueprint
+monitoring_routes = Blueprint('monitoring', __name__, url_prefix='/monitoring')
+
+@monitoring_routes.route('/')
 def monitoring_dashboard():
     """Render the monitoring dashboard page"""
     return render_template('monitoring.html')
 
-@monitoring_routes.route('/monitoring/current')
+@monitoring_routes.route('/current')
 def get_current_metrics():
     """
     API endpoint to get current system metrics
@@ -20,11 +23,11 @@ def get_current_metrics():
     
     if not metrics:
         return jsonify({
-            'cpu_usage': 0,
-            'memory_usage': 0,
+            'cpu_usage': 0.0,
+            'memory_usage': 0.0,
             'chunks_processed': 0,
             'chunks_pending': 0,
-            'timestamp': datetime.datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow().isoformat()
         })
     
     return jsonify({
@@ -35,18 +38,23 @@ def get_current_metrics():
         'timestamp': metrics.timestamp.isoformat()
     })
 
-@monitoring_routes.route('/monitoring/history')
+@monitoring_routes.route('/history')
 def get_metrics_history():
     """
     API endpoint to get historical system metrics
     """
-    # Get metrics from the last 24 hours
-    since = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
-    metrics = SystemMetrics.query.filter(SystemMetrics.timestamp >= since).order_by(SystemMetrics.timestamp).all()
+    # Get metrics from the last 24 hours, with a cap on the number of records
+    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    metrics = SystemMetrics.query.filter(SystemMetrics.timestamp >= cutoff_time).order_by(SystemMetrics.timestamp).all()
     
-    history = []
+    # Limit to at most 100 data points
+    if len(metrics) > 100:
+        step = len(metrics) // 100
+        metrics = metrics[::step]
+    
+    results = []
     for metric in metrics:
-        history.append({
+        results.append({
             'cpu_usage': metric.cpu_usage,
             'memory_usage': metric.memory_usage,
             'chunks_processed': metric.chunks_processed,
@@ -54,80 +62,103 @@ def get_metrics_history():
             'timestamp': metric.timestamp.isoformat()
         })
     
-    return jsonify(history)
+    return jsonify(results)
 
-@monitoring_routes.route('/monitoring/queue')
+@monitoring_routes.route('/queue')
 def get_processing_queue():
     """
     API endpoint to get current processing queue status
     """
-    # Count documents in different states
-    pending = ProcessingQueue.query.filter_by(status='pending').count()
-    processing = ProcessingQueue.query.filter_by(status='processing').count()
-    completed = ProcessingQueue.query.filter_by(status='completed').count()
-    failed = ProcessingQueue.query.filter_by(status='failed').count()
+    # Count by status
+    stats = db.session.execute(
+        sa.select(
+            ProcessingQueue.status,
+            sa.func.count().label('count')
+        ).group_by(ProcessingQueue.status)
+    ).all()
     
-    # Get the most recent queue entries
-    recent_queue = ProcessingQueue.query.order_by(ProcessingQueue.queued_at.desc()).limit(10).all()
+    # Prepare stats
+    total = 0
+    pending = 0
+    processing = 0
+    completed = 0
+    failed = 0
     
-    queue_entries = []
-    for entry in recent_queue:
+    for status, count in stats:
+        total += count
+        if status == 'pending':
+            pending = count
+        elif status == 'processing':
+            processing = count
+        elif status == 'completed':
+            completed = count
+        elif status == 'failed':
+            failed = count
+    
+    # Get recent entries (10 most recent)
+    recent_entries = []
+    queue_entries = ProcessingQueue.query.order_by(ProcessingQueue.queued_at.desc()).limit(10).all()
+    
+    for entry in queue_entries:
         document = Document.query.get(entry.document_id)
-        title = document.title if document else 'Unknown Document'
-        
-        queue_entries.append({
-            'id': entry.id,
-            'document_id': entry.document_id,
-            'document_title': title,
-            'status': entry.status,
-            'queued_at': entry.queued_at.isoformat(),
-            'started_at': entry.started_at.isoformat() if entry.started_at else None,
-            'completed_at': entry.completed_at.isoformat() if entry.completed_at else None,
-            'error_message': entry.error_message
-        })
+        if document:
+            recent_entries.append({
+                'id': entry.id,
+                'document_id': entry.document_id,
+                'document_title': document.title or 'Untitled Document',
+                'status': entry.status,
+                'queued_at': entry.queued_at.isoformat() if entry.queued_at else None,
+                'started_at': entry.started_at.isoformat() if entry.started_at else None,
+                'completed_at': entry.completed_at.isoformat() if entry.completed_at else None,
+                'error_message': entry.error_message
+            })
     
     return jsonify({
+        'total': total,
         'pending': pending,
         'processing': processing,
         'completed': completed,
         'failed': failed,
-        'total': pending + processing + completed + failed,
-        'recent_queue': queue_entries
+        'recent_queue': recent_entries
     })
 
-@monitoring_routes.route('/monitoring/stats')
+@monitoring_routes.route('/stats')
 def get_system_stats():
     """
     API endpoint to get overall system statistics
     """
-    # Count total documents
+    # Count documents
     total_documents = Document.query.count()
     processed_documents = Document.query.filter_by(processed=True).count()
+    processing_percentage = (processed_documents / total_documents * 100) if total_documents > 0 else 0
     
     # Count chunks and embeddings
     total_chunks = TextChunk.query.count()
     total_embeddings = VectorEmbedding.query.count()
+    embeddings_percentage = (total_embeddings / total_chunks * 100) if total_chunks > 0 else 0
     
-    # Avg processing time for completed documents
-    avg_processing_time = db.session.query(
-        func.avg(ProcessingQueue.completed_at - ProcessingQueue.started_at)
-    ).filter(
-        ProcessingQueue.status == 'completed',
-        ProcessingQueue.started_at != None,
-        ProcessingQueue.completed_at != None
-    ).scalar()
-    
-    # Convert timedelta to seconds if not None
-    avg_time_seconds = None
-    if avg_processing_time:
-        avg_time_seconds = avg_processing_time.total_seconds()
+    # Calculate average processing time
+    avg_processing_time = None
+    if processed_documents > 0:
+        completed_queue_entries = ProcessingQueue.query.filter_by(status='completed').all()
+        if completed_queue_entries:
+            total_time = 0
+            count = 0
+            for entry in completed_queue_entries:
+                if entry.started_at and entry.completed_at:
+                    processing_time = (entry.completed_at - entry.started_at).total_seconds()
+                    total_time += processing_time
+                    count += 1
+            
+            if count > 0:
+                avg_processing_time = total_time / count
     
     return jsonify({
         'total_documents': total_documents,
         'processed_documents': processed_documents,
-        'processing_percentage': round((processed_documents / total_documents) * 100, 1) if total_documents > 0 else 0,
+        'processing_percentage': round(processing_percentage, 1),
         'total_chunks': total_chunks,
         'total_embeddings': total_embeddings,
-        'embeddings_percentage': round((total_embeddings / total_chunks) * 100, 1) if total_chunks > 0 else 0,
-        'avg_processing_time_seconds': avg_time_seconds
+        'embeddings_percentage': round(embeddings_percentage, 1),
+        'avg_processing_time_seconds': avg_processing_time
     })
