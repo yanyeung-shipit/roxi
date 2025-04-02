@@ -3,7 +3,7 @@ import logging
 import datetime
 import random
 import threading
-from app import db
+from app import db, app
 from models import Document, TextChunk, VectorEmbedding, ProcessingQueue
 from utils.pdf_processor import extract_text_from_pdf, chunk_text
 from utils.embeddings import generate_embeddings
@@ -13,8 +13,12 @@ from utils.citation_generator import generate_apa_citation
 logger = logging.getLogger(__name__)
 
 def process_document_job(document_id):
-    """Process a document in a separate thread"""
-    thread = threading.Thread(target=process_document, args=(document_id,))
+    """Process a document in a separate thread with proper application context"""
+    def process_with_app_context(doc_id):
+        with app.app_context():
+            process_document(doc_id)
+    
+    thread = threading.Thread(target=process_with_app_context, args=(document_id,))
     thread.daemon = True
     thread.start()
     return thread
