@@ -9,11 +9,11 @@ class Document(db.Model):
     """Model for storing document information"""
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.String(1000))
+    title = db.Column(db.Text)
     authors = db.Column(db.Text)  # Changed to Text to handle long author lists
     doi = db.Column(db.String(100), unique=True)
     publication_date = db.Column(db.DateTime)
-    journal = db.Column(db.String(500))
+    journal = db.Column(db.Text)
     citation_apa = db.Column(db.Text)
     tags = db.Column(ARRAY(db.String(100)))
     upload_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)

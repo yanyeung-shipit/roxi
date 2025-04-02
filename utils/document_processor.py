@@ -131,6 +131,7 @@ def process_document(document_id):
             # Get title
             title = metadata.get('title')
             if title and isinstance(title, list) and len(title) > 0:
+                # Use the full title, now that we've changed to TEXT type
                 document.title = title[0]
             
             # Get authors
