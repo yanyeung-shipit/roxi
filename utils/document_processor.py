@@ -387,22 +387,36 @@ def generate_tags_from_content(text, document=None, metadata=None):
                 elif ';' in keyword_text:
                     keyword_list = [k.strip() for k in keyword_text.split(';')]
                 elif '.' in keyword_text and keyword_text.count('.') > 1:
-                    # Some journal formats use periods to separate keywords, with various spacing patterns:
-                    # 1. "keyword1. keyword2. keyword3" (period followed by space)
-                    # 2. "keyword1 .keyword2 .keyword3" (space followed by period)
-                    # 3. "keyword1.keyword2.keyword3" (period with no spaces)
+                    # To handle the pattern in "Keywords Rheumatoid vasculitis .Clinical features .Pathogenesis .Investigations .Treatment .Extra-articular manifestations"
+                    # We need a different approach as the periods are adjacent to words
                     
-                    # First, normalize by replacing ". " (period+space) with " | " (space+pipe+space)
-                    normalized = keyword_text.replace('. ', ' | ')
-                    
-                    # Then replace " ." (space+period) with " | " (space+pipe+space)
-                    normalized = normalized.replace(' .', ' | ')
-                    
-                    # Then replace remaining periods with pipe (this would be format 3)
-                    normalized = normalized.replace('.', ' | ')
-                    
-                    # Split by our normalized separator
-                    keyword_list = [k.strip() for k in normalized.split('|') if k.strip()]
+                    # Check for the specific pattern of ".Word" (period immediately followed by uppercase letter)
+                    if re.search(r'\.[A-Z]', keyword_text):
+                        # This is the format from the rheumatoid vasculitis paper
+                        # First, extract the first keyword before any period
+                        first_match = re.match(r'^([^.]+)', keyword_text)
+                        keywords = []
+                        if first_match:
+                            keywords.append(first_match.group(1).strip())
+                        
+                        # Then extract all keywords that start with period + capital letter
+                        period_keywords = re.findall(r'\.([A-Z][^.]+)(?=\.|$)', keyword_text)
+                        keywords.extend([k.strip() for k in period_keywords if k.strip()])
+                        
+                        keyword_list = keywords
+                    else:
+                        # For other period formats, use our normalized approach
+                        # First, normalize by replacing ". " (period+space) with " | " (space+pipe+space)
+                        normalized = keyword_text.replace('. ', ' | ')
+                        
+                        # Then replace " ." (space+period) with " | " (space+pipe+space)
+                        normalized = normalized.replace(' .', ' | ')
+                        
+                        # Then replace remaining periods with pipe (this would be format 3)
+                        normalized = normalized.replace('.', ' | ')
+                        
+                        # Split by our normalized separator
+                        keyword_list = [k.strip() for k in normalized.split('|') if k.strip()]
                 else:
                     # If no recognized separators, it might be one keyword or space-separated
                     keyword_list = [keyword_text]
@@ -550,8 +564,9 @@ def generate_tags_from_content(text, document=None, metadata=None):
         # and sort by score (most frequently mentioned first)
         significant_tags = []
         for tag, score in sorted(tag_scores.items(), key=lambda x: x[1], reverse=True):
-            # Only include tags mentioned at least 3 times
-            if score >= 3:
+            # Only include tags mentioned at least 5 times - increased threshold to avoid false positives
+            # This helps filter out diseases mentioned only in passing
+            if score >= 5:
                 significant_tags.append(tag)
         
         # Add content-based tags that aren't already in our tags list
