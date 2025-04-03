@@ -98,7 +98,10 @@
                                 <!-- Collections will be loaded here -->
                                 <option value="-1" disabled>Loading collections...</option>
                             </select>
-                            <div class="d-flex justify-content-end mt-2">
+                            <div class="d-flex justify-content-between mt-2">
+                                <button class="btn btn-sm btn-outline-secondary" id="manageCollectionsButton">
+                                    <i class="fas fa-edit"></i> Manage Collections
+                                </button>
                                 <button class="btn btn-sm btn-outline-primary" id="newCollectionButton">
                                     <i class="fas fa-folder-plus"></i> New Collection
                                 </button>
@@ -243,6 +246,48 @@
                 <button type="button" class="btn btn-danger d-none" id="deleteCollectionButton">Delete</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveCollectionButton">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Collections Modal -->
+<div class="modal fade" id="manageCollectionsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Collections</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Path</th>
+                                <th>Documents</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collectionsTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center">
+                                    <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="ms-2">Loading collections...</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="addCollectionBtn">
+                    <i class="fas fa-folder-plus"></i> New Collection
+                </button>
             </div>
         </div>
     </div>

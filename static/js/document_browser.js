@@ -12,12 +12,14 @@ function initDocumentBrowser() {
     const uploadCollection = document.getElementById('uploadCollection');
     const actionButtons = document.querySelector('.action-buttons');
     const newCollectionButton = document.getElementById('newCollectionButton');
+    const manageCollectionsButton = document.getElementById('manageCollectionsButton');
     const editDocumentButton = document.getElementById('editDocumentButton');
     const deleteDocumentButton = document.getElementById('deleteDocumentButton');
     
     // Modals
     const editDocumentModal = new bootstrap.Modal(document.getElementById('editDocumentModal'));
     const collectionModal = new bootstrap.Modal(document.getElementById('collectionModal'));
+    const manageCollectionsModal = new bootstrap.Modal(document.getElementById('manageCollectionsModal'));
     const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
     
     // Modal elements
@@ -25,6 +27,8 @@ function initDocumentBrowser() {
     const editDocumentTitle = document.getElementById('editDocumentTitle');
     const editDocumentTags = document.getElementById('editDocumentTags');
     const editDocumentCollection = document.getElementById('editDocumentCollection');
+    const collectionsTableBody = document.getElementById('collectionsTableBody');
+    const addCollectionBtn = document.getElementById('addCollectionBtn');
     const saveDocumentButton = document.getElementById('saveDocumentButton');
     
     const collectionId = document.getElementById('collectionId');
@@ -601,6 +605,144 @@ function initDocumentBrowser() {
     }
     
     /**
+     * Populate the collections table for the manage collections modal
+     */
+    function populateCollectionsTable() {
+        if (!collectionsTableBody) return;
+        
+        // Show loading state
+        collectionsTableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-2">Loading collections...</span>
+                </td>
+            </tr>
+        `;
+        
+        // Get the latest collections data
+        fetch('/documents/api/collections')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load collections');
+                }
+                
+                // Clear the table body
+                collectionsTableBody.innerHTML = '';
+                
+                if (data.collections.length === 0) {
+                    collectionsTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center">
+                                <p class="text-muted my-3">No collections found</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Add each collection to the table
+                data.collections.forEach(collection => {
+                    const row = document.createElement('tr');
+                    
+                    // Indentation based on level
+                    const indentation = collection.level > 0 
+                        ? `<span class="ms-${collection.level * 3}"></span>` 
+                        : '';
+                    const levelPrefix = collection.level > 0 ? '↳ ' : '';
+                    
+                    row.innerHTML = `
+                        <td>${indentation}${levelPrefix}${escapeHtml(collection.name)}</td>
+                        <td>${escapeHtml(collection.full_path)}</td>
+                        <td>${collection.total_document_count}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-secondary edit-collection-btn" data-id="${collection.id}">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button type="button" class="btn btn-outline-danger delete-collection-btn" data-id="${collection.id}">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    
+                    collectionsTableBody.appendChild(row);
+                });
+                
+                // Add event listeners to the edit/delete buttons
+                collectionsTableBody.querySelectorAll('.edit-collection-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.dataset.id;
+                        
+                        // Hide manage collections modal
+                        manageCollectionsModal.hide();
+                        
+                        // Load collection data
+                        fetch(`/documents/api/collections/${id}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (!data.success) {
+                                    throw new Error(data.error || 'Failed to load collection data');
+                                }
+                                
+                                // Update form fields
+                                collectionId.value = data.collection.id;
+                                collectionName.value = data.collection.name;
+                                collectionDescription.value = data.collection.description || '';
+                                collectionParent.value = data.collection.parent_id || '';
+                                
+                                // Update modal title
+                                collectionModalTitle.textContent = 'Edit Collection';
+                                
+                                // Show delete button for existing collections
+                                deleteCollectionButton.classList.remove('d-none');
+                                
+                                // Show modal
+                                collectionModal.show();
+                            })
+                            .catch(error => {
+                                console.error('Error loading collection data:', error);
+                                showAlert('Error loading collection data. Please try again.', 'danger');
+                            });
+                    });
+                });
+                
+                collectionsTableBody.querySelectorAll('.delete-collection-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.dataset.id;
+                        
+                        // Hide manage collections modal
+                        manageCollectionsModal.hide();
+                        
+                        // Setup confirmation modal
+                        deleteType = 'collection';
+                        deleteId = id;
+                        deleteConfirmMessage.textContent = 'Are you sure you want to delete this collection? Documents in this collection will not be deleted, but they will no longer be associated with any collection. This action cannot be undone.';
+                        
+                        // Show confirmation modal
+                        deleteConfirmModal.show();
+                    });
+                });
+            })
+            .catch(error => {
+                console.error('Error loading collections:', error);
+                collectionsTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center">
+                            <div class="alert alert-danger">
+                                <strong>Error loading collections.</strong> Please try again.
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+    }
+    
+    /**
      * Load collections
      */
     function loadCollections() {
@@ -775,6 +917,39 @@ function initDocumentBrowser() {
     // Add event listeners for modals and buttons
     
     // New Collection button
+    // Manage Collections Button
+    if (manageCollectionsButton) {
+        manageCollectionsButton.addEventListener('click', () => {
+            // Populate the collections table
+            populateCollectionsTable();
+            // Show the modal
+            manageCollectionsModal.show();
+        });
+    }
+    
+    // Add Collection button in manage collections modal
+    if (addCollectionBtn) {
+        addCollectionBtn.addEventListener('click', () => {
+            // Hide manage collections modal
+            manageCollectionsModal.hide();
+            
+            // Reset form and show new collection modal
+            collectionId.value = '';
+            collectionName.value = '';
+            collectionDescription.value = '';
+            collectionParent.value = '';
+            
+            // Update modal title
+            collectionModalTitle.textContent = 'New Collection';
+            
+            // Hide delete button for new collections
+            deleteCollectionButton.classList.add('d-none');
+            
+            // Show modal
+            collectionModal.show();
+        });
+    }
+    
     if (newCollectionButton) {
         newCollectionButton.addEventListener('click', () => {
             // Reset form
