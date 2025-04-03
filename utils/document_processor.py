@@ -387,16 +387,22 @@ def generate_tags_from_content(text, document=None, metadata=None):
                 elif ';' in keyword_text:
                     keyword_list = [k.strip() for k in keyword_text.split(';')]
                 elif '.' in keyword_text and keyword_text.count('.') > 1:
-                    # Some journal formats use periods to separate keywords (e.g., "keyword1. keyword2. keyword3")
-                    # Only split by period if there are multiple periods (to avoid splitting legitimate phrases)
-                    # Handle the special case where there's a period preceded by a space
-                    # This handles formats like "Rheumatoid vasculitis .Clinical features .Pathogenesis"
-                    if ' .' in keyword_text:
-                        # Split by " ." pattern which indicates a period-based separator with space
-                        keyword_list = [k.strip() for k in keyword_text.split(' .') if k.strip()]
-                    else:
-                        # Normal period separation (less common)
-                        keyword_list = [k.strip() for k in keyword_text.split('.') if k.strip()]
+                    # Some journal formats use periods to separate keywords, with various spacing patterns:
+                    # 1. "keyword1. keyword2. keyword3" (period followed by space)
+                    # 2. "keyword1 .keyword2 .keyword3" (space followed by period)
+                    # 3. "keyword1.keyword2.keyword3" (period with no spaces)
+                    
+                    # First, normalize by replacing ". " (period+space) with " | " (space+pipe+space)
+                    normalized = keyword_text.replace('. ', ' | ')
+                    
+                    # Then replace " ." (space+period) with " | " (space+pipe+space)
+                    normalized = normalized.replace(' .', ' | ')
+                    
+                    # Then replace remaining periods with pipe (this would be format 3)
+                    normalized = normalized.replace('.', ' | ')
+                    
+                    # Split by our normalized separator
+                    keyword_list = [k.strip() for k in normalized.split('|') if k.strip()]
                 else:
                     # If no recognized separators, it might be one keyword or space-separated
                     keyword_list = [keyword_text]
@@ -502,30 +508,54 @@ def generate_tags_from_content(text, document=None, metadata=None):
         
         # Find matches
         content_tags = []
+        tag_scores = {}  # Track how relevant each tag is based on frequency
         
-        # Check for disease terms
+        # Check for disease terms with frequency analysis
         for disease, terms in diseases.items():
+            # Initialize score for this disease
+            tag_scores[disease] = 0
+            
             for term in terms:
-                if term in text_lower:
-                    content_tags.append(disease)
-                    break
+                # Count occurrences of the term
+                count = text_lower.count(term)
+                if count > 0:
+                    # Add to the score for this disease
+                    tag_scores[disease] += count
         
-        # Check for treatment terms
+        # Check for treatment terms with frequency analysis
         for treatment, terms in treatments.items():
+            # Initialize score for this treatment
+            tag_scores[treatment] = 0
+            
             for term in terms:
-                if term in text_lower:
-                    content_tags.append(treatment)
-                    break
+                # Count occurrences of the term
+                count = text_lower.count(term)
+                if count > 0:
+                    # Add to the score for this treatment
+                    tag_scores[treatment] += count
         
-        # Check for document type terms
+        # Check for document type terms with frequency analysis
         for doc_type, terms in document_types.items():
+            # Initialize score for this document type
+            tag_scores[doc_type] = 0
+            
             for term in terms:
-                if term in text_lower:
-                    content_tags.append(doc_type)
-                    break
+                # Count occurrences of the term
+                count = text_lower.count(term)
+                if count > 0:
+                    # Add to the score for this document type
+                    tag_scores[doc_type] += count
+        
+        # Filter out tags with low scores (mentioned only a few times)
+        # and sort by score (most frequently mentioned first)
+        significant_tags = []
+        for tag, score in sorted(tag_scores.items(), key=lambda x: x[1], reverse=True):
+            # Only include tags mentioned at least 3 times
+            if score >= 3:
+                significant_tags.append(tag)
         
         # Add content-based tags that aren't already in our tags list
-        for tag in content_tags:
+        for tag in significant_tags[:3]:  # Limit to top 3 most significant tags
             if tag not in tags:
                 tags.append(tag)
     
