@@ -40,12 +40,11 @@ def list_documents():
                     Document.title.ilike(search_term),
                     Document.authors.ilike(search_term),
                     Document.journal.ilike(search_term),
-                    Document.doi.ilike(search_term)
+                    Document.doi.ilike(search_term),
+                    # Add search by tag content
+                    Document.tags.any(lambda t: t.ilike(search_term))
                 )
             )
-        
-        if tag:
-            query = query.filter(Document.tags.contains([tag]))
             
         # Filter by collection if provided and the column exists
         if collection_id and hasattr(Document, 'collection_id'):

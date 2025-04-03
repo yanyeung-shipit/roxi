@@ -3,7 +3,6 @@
  */
 function initDocumentBrowser() {
     const searchInput = document.getElementById('searchInput');
-    const tagFilters = document.getElementById('tagFilters');
     const documentList = document.getElementById('documentList');
     const documentCount = document.getElementById('documentCount');
     const documentDetails = document.getElementById('documentDetails');
@@ -51,7 +50,6 @@ function initDocumentBrowser() {
     // State
     let currentPage = 1;
     let totalPages = 1;
-    let activeTag = null;
     let activeCollection = '';
     let searchTerm = '';
     let documents = [];
@@ -69,7 +67,6 @@ function initDocumentBrowser() {
             
             // Reload documents
             loadDocuments();
-            loadTags();
             
             // Reset button after a short delay
             setTimeout(() => {
@@ -81,7 +78,6 @@ function initDocumentBrowser() {
     
     // Initial load
     loadDocuments();
-    loadTags();
     loadCollections();
     
     // Handle search input
@@ -111,10 +107,6 @@ function initDocumentBrowser() {
         let params = new URLSearchParams();
         params.append('page', currentPage);
         params.append('per_page', 10);
-        
-        if (activeTag) {
-            params.append('tag', activeTag);
-        }
         
         if (activeCollection) {
             params.append('collection_id', activeCollection);
