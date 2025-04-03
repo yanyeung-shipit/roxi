@@ -2,7 +2,7 @@
 
 /* Document browser layout */
 .document-browser .card {
-    margin-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
     height: 100%;
 }
 
@@ -22,13 +22,18 @@
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
-    margin-bottom: 4px !important;
+    border-top: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0;
+    margin: 0 !important;
+    padding: 0 !important;
     height: auto;
-    min-height: 20px;
+    min-height: 25px;
 }
 
 .document-card .card-body {
     padding: 4px 8px;
+    margin-bottom: 0;
 }
 
 .document-card:hover {
@@ -67,6 +72,7 @@
     max-height: calc(100vh - 350px);
     min-height: 600px;
     overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Make document details scrollable */
@@ -91,8 +97,8 @@
     margin-bottom: 0.15rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    padding: 0.2em 0.4em;
-    font-size: 0.75em;
+    padding: 0.15em 0.4em;
+    font-size: 0.7em;
 }
 
 .tag-badge:hover {
@@ -104,7 +110,7 @@
 }
 
 .tag-list {
-    padding: 0.5rem 0;
+    padding: 0.2rem 0;
 }
 
 /* Citation and metadata */
