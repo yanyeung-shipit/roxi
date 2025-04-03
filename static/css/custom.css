@@ -1,10 +1,28 @@
 /* Custom styles for ROXI */
 
+/* Document browser layout */
+.document-browser .card {
+    margin-bottom: 1.5rem;
+    height: 100%;
+}
+
+/* Make the document cards and document details sections match in height */
+.document-browser .row {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.document-browser .row > div {
+    display: flex;
+    flex-direction: column;
+}
+
 /* Document cards */
 .document-card {
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
+    margin-bottom: 0.75rem;
 }
 
 .document-card:hover {
@@ -39,8 +57,18 @@
 }
 
 .document-list {
-    max-height: 600px;
+    height: 700px;
+    max-height: calc(100vh - 350px);
+    min-height: 600px;
     overflow-y: auto;
+}
+
+/* Make document details scrollable */
+#documentDetails {
+    max-height: 650px;
+    min-height: 600px;
+    overflow-y: auto;
+    padding-right: 10px;
 }
 
 .document-status-processed {
@@ -83,12 +111,20 @@
 .metadata-list {
     display: grid;
     grid-template-columns: 150px 1fr;
-    grid-gap: 0.5rem;
+    grid-gap: 0.75rem;
+    margin-bottom: 1.5rem;
 }
 
 .metadata-list dt {
     font-weight: bold;
     color: var(--bs-gray-400);
+    align-self: start;
+}
+
+.metadata-list dd {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
 }
 
 /* Conversation styles */

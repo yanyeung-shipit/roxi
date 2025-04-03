@@ -2,19 +2,21 @@
 
 {% block content %}
 
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1 class="mb-0">Document Browser</h1>
+<div class="document-browser">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="mb-0">Document Browser</h1>
+            </div>
+            <p class="text-muted">Upload, browse and search your research document collection</p>
         </div>
-        <p class="text-muted">Upload, browse and search your research document collection</p>
     </div>
-</div>
 
-<!-- File Upload Section -->
+<!-- Top Section: Upload and Search -->
 <div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card bg-dark">
+    <!-- Left Side: Upload Documents -->
+    <div class="col-md-6">
+        <div class="card bg-dark h-100">
             <div class="card-body p-4">
                 <h4 class="card-title mb-3">Upload Documents</h4>
                 
@@ -68,53 +70,52 @@
             </div>
         </div>
     </div>
-</div>
-
-<div class="row">
-    <!-- Search and Filters -->
-    <div class="col-md-12 mb-4">
-        <div class="card">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="fas fa-search"></i>
-                            </span>
-                            <input type="text" id="searchInput" class="form-control" placeholder="Search by keyword, title, author, journal, or DOI">
-                        </div>
+    
+    <!-- Right Side: Search and Filters -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h4 class="card-title mb-3">Search & Filter</h4>
+                
+                <div class="mb-4">
+                    <label for="searchInput" class="form-label">Search Documents</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by keyword, title, author, journal, or DOI">
                     </div>
-                    <div class="col-md-4 text-end">
+                    <div class="text-end mt-1">
                         <span class="badge bg-secondary" id="documentCount">0 documents</span>
                     </div>
                 </div>
                 
-                <div class="row mt-3">
-                    <div class="col-md-12">
-                        <div class="mb-3">
-                            <h6 class="mb-2">Filter by collection:</h6>
-                            <select class="form-select" id="collectionFilter">
-                                <option value="">All Collections</option>
-                                <!-- Collections will be loaded here -->
-                                <option value="-1" disabled>Loading collections...</option>
-                            </select>
-                            <div class="d-flex justify-content-between mt-2">
-                                <button class="btn btn-sm btn-outline-secondary" id="manageCollectionsButton">
-                                    <i class="fas fa-edit"></i> Manage Collections
-                                </button>
-                                <button class="btn btn-sm btn-outline-primary" id="newCollectionButton">
-                                    <i class="fas fa-folder-plus"></i> New Collection
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div class="mb-3">
+                    <label for="collectionFilter" class="form-label">Filter by collection</label>
+                    <select class="form-select" id="collectionFilter">
+                        <option value="">All Collections</option>
+                        <!-- Collections will be loaded here -->
+                        <option value="-1" disabled>Loading collections...</option>
+                    </select>
+                </div>
+                
+                <div class="d-flex justify-content-between mt-4">
+                    <button class="btn btn-outline-secondary" id="manageCollectionsButton">
+                        <i class="fas fa-edit me-1"></i> Manage Collections
+                    </button>
+                    <button class="btn btn-outline-primary" id="newCollectionButton">
+                        <i class="fas fa-folder-plus me-1"></i> New Collection
+                    </button>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Document List and Details -->
-    <div class="col-md-4">
+</div>
+
+<!-- Document Browser Section -->
+<div class="row">
+    <!-- Document List -->
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Documents</h5>
@@ -164,7 +165,8 @@
         </div>
     </div>
     
-    <div class="col-md-8">
+    <!-- Document Details -->
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Document Details</h5>
@@ -416,6 +418,7 @@
         </div>
     </div>
 </div>
+</div> <!-- Close document-browser div -->
 {% endblock %}
 
 {% block scripts %}
