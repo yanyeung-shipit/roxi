@@ -397,11 +397,18 @@ def generate_tags_from_content(text, document=None, metadata=None):
                         first_match = re.match(r'^([^.]+)', keyword_text)
                         keywords = []
                         if first_match:
-                            keywords.append(first_match.group(1).strip())
+                            # Extract the first keyword, before any period
+                            first_keyword = first_match.group(1).strip()
+                            if first_keyword and len(first_keyword) > 2:  # Only add if it's meaningful
+                                keywords.append(first_keyword)
                         
                         # Then extract all keywords that start with period + capital letter
+                        # But treat each as a separate keyword (don't keep the period)
                         period_keywords = re.findall(r'\.([A-Z][^.]+)(?=\.|$)', keyword_text)
-                        keywords.extend([k.strip() for k in period_keywords if k.strip()])
+                        for kw in period_keywords:
+                            kw = kw.strip()
+                            if kw and len(kw) > 2:  # Only add if it's meaningful
+                                keywords.append(kw)
                         
                         keyword_list = keywords
                     else:
@@ -473,7 +480,8 @@ def generate_tags_from_content(text, document=None, metadata=None):
         "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-", "seropositive arthritis"],
         "Systemic Lupus Erythematosus": ["systemic lupus", "sle ", "sle,", "sle.", "sle)", "lupus nephritis", "lupus erythematosus"],
         "Psoriatic Arthritis": ["psoriatic arthritis", "psa ", "psa,", "psa.", "psa)"],
-        "Ankylosing Spondylitis": ["ankylosing spondylitis", "as ", "as,", "as.", "as)", "axial spondyloarthritis"],
+        # Remove "as" abbreviation since it's a common preposition
+        "Ankylosing Spondylitis": ["ankylosing spondylitis", "axial spondyloarthritis"],
         "Osteoarthritis": ["osteoarthritis", "oa ", "oa,", "oa.", "oa)", "degenerative joint disease"],
         "Gout": ["gout", "gouty arthritis", "crystal arthropathy", "uric acid"],
         "Systemic Sclerosis": ["systemic sclerosis", "scleroderma", "sclerosis"],
