@@ -486,16 +486,16 @@ function initDocumentBrowser() {
                         <div class="d-flex align-items-start">
                             ${checkboxHtml}
                             <div>
-                                <h6 class="card-title mb-0 text-truncate" style="max-width: 400px; font-size: 0.95rem;">${escapeHtml(doc.title)}</h6>
-                                <div class="d-flex mt-1">
-                                    <small class="text-muted text-truncate me-2" style="max-width: 250px; font-size: 0.8rem;">${escapeHtml(doc.authors || 'Unknown Authors')}</small>
-                                    <small class="text-muted" style="font-size: 0.8rem;">${formatDate(doc.publication_date || doc.upload_date)}</small>
+                                <h6 class="card-title mb-0 text-truncate" style="max-width: 400px; font-size: 0.9rem; line-height: 1.1;">${escapeHtml(doc.title)}</h6>
+                                <div class="d-flex" style="margin-top: 2px;">
+                                    <small class="text-muted text-truncate me-2" style="max-width: 250px; font-size: 0.75rem;">${escapeHtml(doc.authors || 'Unknown Authors')}</small>
+                                    <small class="text-muted" style="font-size: 0.75rem;">${formatDate(doc.publication_date || doc.upload_date)}</small>
                                 </div>
                             </div>
                         </div>
                         ${statusIcon}
                     </div>
-                    <div class="d-flex flex-wrap mt-1 align-items-center" style="font-size: 0.8rem;">
+                    <div class="d-flex flex-wrap align-items-center" style="font-size: 0.75rem; margin-top: 2px;">
                         ${collectionBadge}
                         ${tags}
                     </div>
