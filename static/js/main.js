@@ -141,7 +141,9 @@ function initFileUpload() {
         
         // Store the current batch of files to track completion
         let currentBatchTotal = 0;
-        let previousCompleted = 0;
+        let startingTotal = 0;  // Track the initial state when we first check
+        let startingCompleted = 0; // Track completed at the start
+        let startingFailed = 0; // Track failed at the start
         let batchStarted = false;
         
         // Start checking queue status
@@ -155,15 +157,20 @@ function initFileUpload() {
                     const completed = data.completed;
                     const failed = data.failed;
                     
-                    // If this is the first time we're checking, record the current batch total
+                    // If this is the first time we're checking, record the current batch size
+                    // and the starting counts
                     if (!batchStarted) {
-                        currentBatchTotal = total;
-                        previousCompleted = 0;
+                        startingTotal = total;
+                        startingCompleted = completed;
+                        startingFailed = failed;
+                        currentBatchTotal = pending + processing; // Only count pending and in-progress
                         batchStarted = true;
                     }
                     
-                    // Calculate the number of documents processed in this batch
-                    const batchProcessed = completed + failed - previousCompleted;
+                    // Calculate the number of newly processed documents since we started checking
+                    const newlyCompleted = completed - startingCompleted;
+                    const newlyFailed = failed - startingFailed;
+                    const batchProcessed = newlyCompleted + newlyFailed;
                     
                     // Update queue info - only count the current batch
                     queueInfo.textContent = `${batchProcessed} / ${currentBatchTotal} processed`;
