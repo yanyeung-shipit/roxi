@@ -15,12 +15,20 @@ function initDocumentBrowser() {
     const editDocumentButton = document.getElementById('editDocumentButton');
     const deleteDocumentButton = document.getElementById('deleteDocumentButton');
     const refreshDocumentsBtn = document.getElementById('refreshDocumentsBtn');
+    const batchActionsBtn = document.getElementById('batchActionsBtn');
+    const multiSelectControls = document.getElementById('multiSelectControls');
+    const selectedCount = document.getElementById('selectedCount');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+    const batchMoveBtn = document.getElementById('batchMoveBtn');
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     
     // Modals
     const editDocumentModal = new bootstrap.Modal(document.getElementById('editDocumentModal'));
     const collectionModal = new bootstrap.Modal(document.getElementById('collectionModal'));
     const manageCollectionsModal = new bootstrap.Modal(document.getElementById('manageCollectionsModal'));
     const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+    const batchMoveModal = new bootstrap.Modal(document.getElementById('batchMoveModal'));
     
     // Modal elements
     const editDocumentId = document.getElementById('editDocumentId');
@@ -47,6 +55,14 @@ function initDocumentBrowser() {
     const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
     const confirmDeleteButton = document.getElementById('confirmDeleteButton');
     const viewPdfButton = document.getElementById('viewPdfButton');
+    
+    const batchMoveCollection = document.getElementById('batchMoveCollection');
+    const batchMoveCount = document.getElementById('batchMoveCount');
+    const confirmBatchMoveButton = document.getElementById('confirmBatchMoveButton');
+    
+    // State variables
+    let multiSelectMode = false;
+    let selectedDocuments = new Set();
     
     // State
     let currentPage = 1;
@@ -75,6 +91,222 @@ function initDocumentBrowser() {
                 refreshDocumentsBtn.disabled = false;
             }, 1000);
         });
+    }
+    
+    // Multi-select mode controls
+    if (batchActionsBtn) {
+        batchActionsBtn.addEventListener('click', toggleMultiSelectMode);
+    }
+    
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', selectAllDocuments);
+    }
+    
+    if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', clearDocumentSelection);
+    }
+    
+    if (batchMoveBtn) {
+        batchMoveBtn.addEventListener('click', () => {
+            prepareForBatchMove();
+            batchMoveModal.show();
+        });
+    }
+    
+    if (batchDeleteBtn) {
+        batchDeleteBtn.addEventListener('click', () => {
+            prepareBatchDelete();
+        });
+    }
+    
+    if (confirmBatchMoveButton) {
+        confirmBatchMoveButton.addEventListener('click', executeBatchMove);
+    }
+    
+    /**
+     * Toggle multi-select mode
+     */
+    function toggleMultiSelectMode() {
+        multiSelectMode = !multiSelectMode;
+        
+        if (multiSelectMode) {
+            // Enable multi-select mode
+            batchActionsBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+            batchActionsBtn.classList.remove('btn-outline-primary');
+            batchActionsBtn.classList.add('btn-success');
+            multiSelectControls.classList.remove('d-none');
+            selectedDocuments.clear();
+            updateSelectedCount();
+        } else {
+            // Disable multi-select mode
+            batchActionsBtn.innerHTML = '<i class="fas fa-tasks"></i> Batch Actions';
+            batchActionsBtn.classList.remove('btn-success');
+            batchActionsBtn.classList.add('btn-outline-primary');
+            multiSelectControls.classList.add('d-none');
+            selectedDocuments.clear();
+        }
+        
+        // Reload documents to update UI
+        loadDocuments();
+    }
+    
+    /**
+     * Toggle document selection
+     */
+    function toggleDocumentSelection(docId, isSelected) {
+        if (isSelected) {
+            selectedDocuments.add(String(docId));
+        } else {
+            selectedDocuments.delete(String(docId));
+        }
+        
+        // Update the selected count
+        updateSelectedCount();
+        
+        // Update card styling
+        const card = document.querySelector(`.document-card[data-id="${docId}"]`);
+        if (card) {
+            if (isSelected) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        }
+        
+        // Show/hide batch actions button based on selection
+        if (selectedDocuments.size > 0) {
+            batchActionsBtn.classList.remove('d-none');
+        } else {
+            batchActionsBtn.classList.remove('d-none'); // Always show in multi-select mode
+        }
+    }
+    
+    /**
+     * Update the selected count display
+     */
+    function updateSelectedCount() {
+        selectedCount.textContent = `${selectedDocuments.size} selected`;
+        batchMoveCount.textContent = selectedDocuments.size;
+    }
+    
+    /**
+     * Select all documents on the current page
+     */
+    function selectAllDocuments() {
+        documents.forEach(doc => {
+            selectedDocuments.add(String(doc.id));
+        });
+        
+        updateSelectedCount();
+        loadDocuments(); // Reload to update checkboxes
+    }
+    
+    /**
+     * Clear document selection
+     */
+    function clearDocumentSelection() {
+        selectedDocuments.clear();
+        updateSelectedCount();
+        loadDocuments(); // Reload to update checkboxes
+    }
+    
+    /**
+     * Prepare the batch move modal
+     */
+    function prepareForBatchMove() {
+        // Clear the collection dropdown
+        batchMoveCollection.innerHTML = '<option value="">None (Root)</option>';
+        
+        // Populate with collections
+        collections.forEach(collection => {
+            const option = document.createElement('option');
+            option.value = collection.id;
+            option.textContent = collection.full_path;
+            batchMoveCollection.appendChild(option);
+        });
+        
+        // Update the count
+        batchMoveCount.textContent = selectedDocuments.size;
+    }
+    
+    /**
+     * Execute batch move operation
+     */
+    function executeBatchMove() {
+        const collectionId = batchMoveCollection.value;
+        const documentIds = Array.from(selectedDocuments);
+        
+        if (documentIds.length === 0) {
+            showAlert('No documents selected.', 'warning');
+            batchMoveModal.hide();
+            return;
+        }
+        
+        // Show loading state
+        confirmBatchMoveButton.disabled = true;
+        confirmBatchMoveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Moving...';
+        
+        // Send batch update request
+        const promises = documentIds.map(docId => {
+            return fetch(`/documents/api/documents/${docId}/collection`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    collection_id: collectionId || null // Use null for root
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || `Failed to move document ${docId}`);
+                }
+                return data;
+            });
+        });
+        
+        Promise.all(promises)
+            .then(() => {
+                showAlert(`Successfully moved ${documentIds.length} documents.`, 'success');
+                batchMoveModal.hide();
+                
+                // Reload documents
+                loadDocuments();
+                
+                // Reset multi-select mode
+                toggleMultiSelectMode();
+            })
+            .catch(error => {
+                console.error('Error moving documents:', error);
+                showAlert('Error moving documents. Some documents may not have been moved.', 'danger');
+                
+                // Re-enable the button
+                confirmBatchMoveButton.disabled = false;
+                confirmBatchMoveButton.textContent = 'Move Documents';
+            });
+    }
+    
+    /**
+     * Prepare for batch delete operation
+     */
+    function prepareBatchDelete() {
+        const documentIds = Array.from(selectedDocuments);
+        
+        if (documentIds.length === 0) {
+            showAlert('No documents selected.', 'warning');
+            return;
+        }
+        
+        // Update confirmation message
+        deleteConfirmMessage.textContent = `Are you sure you want to delete ${documentIds.length} documents? This action cannot be undone.`;
+        
+        // Set delete type and id
+        deleteType = 'batch_documents';
+        deleteId = documentIds;
+        
+        // Show confirmation modal
+        deleteConfirmModal.show();
     }
     
     // Initial load
@@ -208,38 +440,74 @@ function initDocumentBrowser() {
             
             const card = document.createElement('div');
             card.className = 'card document-card mb-3';
+            if (selectedDocuments.has(String(doc.id))) {
+                card.classList.add('selected');
+            }
             card.dataset.id = doc.id;
+            
+            const checkboxHtml = multiSelectMode ? 
+                `<div class="form-check document-checkbox">
+                    <input class="form-check-input doc-select-checkbox" type="checkbox" value="${doc.id}" 
+                        ${selectedDocuments.has(String(doc.id)) ? 'checked' : ''}>
+                </div>` : '';
+            
             card.innerHTML = `
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <h5 class="card-title">${escapeHtml(doc.title)}</h5>
-                        ${statusIcon}
-                    </div>
-                    <h6 class="card-subtitle mb-2 text-muted">${escapeHtml(doc.authors || 'Unknown Authors')}</h6>
-                    <p class="card-text small text-muted">
-                        ${doc.journal ? `${escapeHtml(doc.journal)} - ` : ''}
-                        ${formatDate(doc.publication_date || doc.upload_date)}
-                    </p>
-                    <div class="d-flex flex-wrap mt-2 align-items-center">
-                        ${collectionBadge}
-                        ${tags}
+                    <div class="d-flex">
+                        ${checkboxHtml}
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h5 class="document-title">${escapeHtml(doc.title)}</h5>
+                                ${statusIcon}
+                            </div>
+                            <div class="document-authors">${escapeHtml(doc.authors || 'Unknown Authors')}</div>
+                            <p class="card-text small text-muted">
+                                ${doc.journal ? `${escapeHtml(doc.journal)} - ` : ''}
+                                ${formatDate(doc.publication_date || doc.upload_date)}
+                            </p>
+                            <div class="d-flex flex-wrap mt-2 align-items-center">
+                                ${collectionBadge}
+                                ${tags}
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
             
-            // Add click handler
-            card.addEventListener('click', () => {
-                // Remove active class from all cards
-                document.querySelectorAll('.document-card').forEach(card => {
-                    card.classList.remove('border-primary');
+            // Add click handlers
+            if (multiSelectMode) {
+                // In multi-select mode, clicking the checkbox toggles selection
+                const checkbox = card.querySelector('.doc-select-checkbox');
+                if (checkbox) {
+                    checkbox.addEventListener('change', (e) => {
+                        e.stopPropagation();
+                        toggleDocumentSelection(doc.id, checkbox.checked);
+                    });
+                    
+                    // Clicking on the card also toggles the checkbox
+                    card.addEventListener('click', (e) => {
+                        // Don't toggle if clicking on the checkbox directly
+                        if (e.target !== checkbox) {
+                            checkbox.checked = !checkbox.checked;
+                            toggleDocumentSelection(doc.id, checkbox.checked);
+                        }
+                    });
+                }
+            } else {
+                // Normal mode: clicking shows document details
+                card.addEventListener('click', () => {
+                    // Remove active class from all cards
+                    document.querySelectorAll('.document-card').forEach(card => {
+                        card.classList.remove('border-primary');
+                    });
+                    
+                    // Add active class to clicked card
+                    card.classList.add('border-primary');
+                    
+                    // Show document details
+                    showDocumentDetails(doc.id);
                 });
-                
-                // Add active class to clicked card
-                card.classList.add('border-primary');
-                
-                // Show document details
-                showDocumentDetails(doc.id);
-            });
+            }
             
             documentList.appendChild(card);
         });
@@ -1224,32 +1492,76 @@ function initDocumentBrowser() {
                 return;
             }
             
-            let url = '';
-            let successMessage = '';
+            // Show loading state
+            confirmDeleteButton.disabled = true;
+            confirmDeleteButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Deleting...';
             
-            if (deleteType === 'document') {
-                url = `/documents/api/documents/${deleteId}`;
-                successMessage = 'Document deleted successfully.';
-            } else if (deleteType === 'collection') {
-                url = `/documents/api/collections/${deleteId}`;
-                successMessage = 'Collection deleted successfully.';
-            }
-            
-            fetch(url, {
-                method: 'DELETE'
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to delete item');
-                    }
-                    
-                    // Close modal
-                    deleteConfirmModal.hide();
-                    
-                    if (deleteType === 'document') {
+            if (deleteType === 'batch_documents') {
+                // Handle batch document deletion
+                const documentIds = deleteId;
+                const promises = documentIds.map(docId => {
+                    return fetch(`/documents/api/documents/${docId}`, {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            throw new Error(data.error || `Failed to delete document ${docId}`);
+                        }
+                        return data;
+                    });
+                });
+                
+                Promise.all(promises)
+                    .then(() => {
+                        // Close modal
+                        deleteConfirmModal.hide();
+                        
+                        // Show success message
+                        showAlert(`Successfully deleted ${documentIds.length} documents.`, 'success');
+                        
+                        // Reset multi-select mode
+                        toggleMultiSelectMode();
+                        
                         // Reload document list
                         loadDocuments();
+                    })
+                    .catch(error => {
+                        console.error('Error deleting documents:', error);
+                        showAlert('Error deleting documents. Some documents may not have been deleted.', 'danger');
+                        
+                        // Re-enable the button
+                        confirmDeleteButton.disabled = false;
+                        confirmDeleteButton.textContent = 'Delete';
+                    });
+            } else {
+                // Handle single document or collection deletion
+                let url = '';
+                let successMessage = '';
+                
+                if (deleteType === 'document') {
+                    url = `/documents/api/documents/${deleteId}`;
+                    successMessage = 'Document deleted successfully.';
+                } else if (deleteType === 'collection') {
+                    url = `/documents/api/collections/${deleteId}`;
+                    successMessage = 'Collection deleted successfully.';
+                }
+                
+                fetch(url, {
+                    method: 'DELETE'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            throw new Error(data.error || 'Failed to delete item');
+                        }
+                        
+                        // Close modal
+                        deleteConfirmModal.hide();
+                        
+                        if (deleteType === 'document') {
+                            // Reload document list
+                            loadDocuments();
                         
                         // Clear document details
                         documentDetails.innerHTML = `

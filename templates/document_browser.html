@@ -114,15 +114,39 @@
     </div>
     
     <!-- Document List and Details -->
-    <div class="col-md-4">
+    <div class="col-md-5">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Documents</h5>
-                <button id="refreshDocumentsBtn" class="btn btn-sm btn-outline-secondary" title="Refresh document list">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
+                <div>
+                    <button id="batchActionsBtn" class="btn btn-sm btn-outline-primary d-none me-2" title="Actions for selected documents">
+                        <i class="fas fa-tasks"></i> Batch Actions
+                    </button>
+                    <button id="refreshDocumentsBtn" class="btn btn-sm btn-outline-secondary" title="Refresh document list">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
+                <div id="multiSelectControls" class="p-2 bg-dark border-bottom d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span id="selectedCount" class="badge bg-primary me-2">0 selected</span>
+                            <button id="selectAllBtn" class="btn btn-sm btn-outline-secondary me-1">Select All</button>
+                            <button id="clearSelectionBtn" class="btn btn-sm btn-outline-secondary">Clear</button>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="batchActionDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Actions
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="batchActionDropdown">
+                                <li><a class="dropdown-item" href="#" id="batchMoveBtn">Move to Collection</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" id="batchDeleteBtn">Delete Selected</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
                 <div id="documentList" class="document-list">
                     <div class="text-center p-5">
                         <div class="spinner-border text-secondary" role="status">
@@ -142,7 +166,7 @@
         </div>
     </div>
     
-    <div class="col-md-8">
+    <div class="col-md-7">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Document Details</h5>
@@ -336,6 +360,34 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteButton">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Move to Collection Modal -->
+<div class="modal fade" id="batchMoveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Move Documents to Collection</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="batchMoveCollection" class="form-label">Select Collection</label>
+                    <select class="form-select" id="batchMoveCollection">
+                        <option value="">None (Root)</option>
+                        <!-- Collections will be populated here -->
+                    </select>
+                </div>
+                <div class="alert alert-info">
+                    <span id="batchMoveCount">0</span> documents will be moved to the selected collection.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmBatchMoveButton">Move Documents</button>
             </div>
         </div>
     </div>
