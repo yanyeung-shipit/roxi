@@ -17,6 +17,7 @@ dependencies = [
     "redis>=5.2.1",
     "requests>=2.32.3",
     "sqlalchemy>=2.0.40",
+    "trafilatura>=2.0.0",
     "werkzeug>=3.1.3",
 ]
 

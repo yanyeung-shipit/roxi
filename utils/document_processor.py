@@ -127,7 +127,8 @@ def process_document(document_id):
         text_sample = text[:1000]
         
         # Try to extract DOI directly from text first
-        doi_match = re.search(r'doi:?\s*(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)', text_sample, re.IGNORECASE)
+        from utils.doi_validator import DOI_WITH_PREFIX_REGEX
+        doi_match = re.search(DOI_WITH_PREFIX_REGEX, text_sample, re.IGNORECASE)
         if doi_match:
             doi = doi_match.group(1)
             document.doi = doi
