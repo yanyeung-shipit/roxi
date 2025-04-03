@@ -389,7 +389,14 @@ def generate_tags_from_content(text, document=None, metadata=None):
                 elif '.' in keyword_text and keyword_text.count('.') > 1:
                     # Some journal formats use periods to separate keywords (e.g., "keyword1. keyword2. keyword3")
                     # Only split by period if there are multiple periods (to avoid splitting legitimate phrases)
-                    keyword_list = [k.strip() for k in keyword_text.split('.') if k.strip()]
+                    # Handle the special case where there's a period preceded by a space
+                    # This handles formats like "Rheumatoid vasculitis .Clinical features .Pathogenesis"
+                    if ' .' in keyword_text:
+                        # Split by " ." pattern which indicates a period-based separator with space
+                        keyword_list = [k.strip() for k in keyword_text.split(' .') if k.strip()]
+                    else:
+                        # Normal period separation (less common)
+                        keyword_list = [k.strip() for k in keyword_text.split('.') if k.strip()]
                 else:
                     # If no recognized separators, it might be one keyword or space-separated
                     keyword_list = [keyword_text]
