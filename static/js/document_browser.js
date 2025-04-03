@@ -16,11 +16,20 @@ function initDocumentBrowser() {
     const deleteDocumentButton = document.getElementById('deleteDocumentButton');
     const refreshDocumentsBtn = document.getElementById('refreshDocumentsBtn');
     
+    // Multi-select elements
+    const toggleMultiSelectBtn = document.getElementById('toggleMultiSelectBtn');
+    const multiSelectActions = document.getElementById('multiSelectActions');
+    const selectedCount = document.getElementById('selectedCount');
+    const batchMoveBtn = document.getElementById('batchMoveBtn');
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    
     // Modals
     const editDocumentModal = new bootstrap.Modal(document.getElementById('editDocumentModal'));
     const collectionModal = new bootstrap.Modal(document.getElementById('collectionModal'));
     const manageCollectionsModal = new bootstrap.Modal(document.getElementById('manageCollectionsModal'));
     const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+    const batchMoveModal = new bootstrap.Modal(document.getElementById('batchMoveModal'));
+    const batchDeleteModal = new bootstrap.Modal(document.getElementById('batchDeleteModal'));
     
     // Modal elements
     const editDocumentId = document.getElementById('editDocumentId');
@@ -48,6 +57,17 @@ function initDocumentBrowser() {
     const confirmDeleteButton = document.getElementById('confirmDeleteButton');
     const viewPdfButton = document.getElementById('viewPdfButton');
     
+    // Batch operation elements
+    const batchMoveCollection = document.getElementById('batchMoveCollection');
+    const batchMoveCount = document.getElementById('batchMoveCount').querySelector('span');
+    const confirmBatchMoveButton = document.getElementById('confirmBatchMoveButton');
+    const batchDeleteCount = document.getElementById('batchDeleteCount');
+    const confirmBatchDeleteButton = document.getElementById('confirmBatchDeleteButton');
+    
+    // Multi-select state
+    let multiSelectMode = false;
+    let selectedDocuments = [];
+    
     // State
     let currentPage = 1;
     let totalPages = 1;
@@ -74,6 +94,244 @@ function initDocumentBrowser() {
                 refreshDocumentsBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
                 refreshDocumentsBtn.disabled = false;
             }, 1000);
+        });
+    }
+    
+    // Toggle multi-select mode
+    if (toggleMultiSelectBtn) {
+        toggleMultiSelectBtn.addEventListener('click', () => {
+            multiSelectMode = !multiSelectMode;
+            
+            // Update UI based on mode
+            if (multiSelectMode) {
+                // Enter multi-select mode
+                toggleMultiSelectBtn.classList.add('active');
+                multiSelectActions.classList.remove('d-none');
+                // Hide single document action buttons
+                if (actionButtons) {
+                    actionButtons.classList.add('d-none');
+                }
+                // Clear details panel
+                documentDetails.innerHTML = `
+                    <div class="text-center p-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-check-square mb-3"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                        <p class="text-muted">Multi-select mode active</p>
+                        <p class="text-muted small">Select documents to perform batch operations</p>
+                    </div>
+                `;
+            } else {
+                // Exit multi-select mode
+                toggleMultiSelectBtn.classList.remove('active');
+                multiSelectActions.classList.add('d-none');
+                // Clear selection
+                selectedDocuments = [];
+                updateSelectedCount();
+            }
+            
+            // Re-render document list to update checkboxes
+            renderDocuments(documents);
+        });
+    }
+    
+    // Batch move button handler
+    if (batchMoveBtn) {
+        batchMoveBtn.addEventListener('click', () => {
+            // Update counter in modal
+            batchMoveCount.textContent = selectedDocuments.length;
+            
+            // Populate collections dropdown if not already done
+            if (batchMoveCollection.children.length <= 1) {
+                populateCollectionsDropdown(batchMoveCollection);
+            }
+            
+            // Show modal
+            batchMoveModal.show();
+        });
+    }
+    
+    // Batch delete button handler
+    if (batchDeleteBtn) {
+        batchDeleteBtn.addEventListener('click', () => {
+            // Update counter in modal
+            batchDeleteCount.textContent = selectedDocuments.length;
+            
+            // Show modal
+            batchDeleteModal.show();
+        });
+    }
+    
+    // Confirm batch move handler
+    if (confirmBatchMoveButton) {
+        confirmBatchMoveButton.addEventListener('click', () => {
+            // Get selected collection ID
+            const collectionId = batchMoveCollection.value;
+            
+            // Perform batch move
+            performBatchMove(selectedDocuments, collectionId);
+            
+            // Hide modal
+            batchMoveModal.hide();
+        });
+    }
+    
+    // Confirm batch delete handler
+    if (confirmBatchDeleteButton) {
+        confirmBatchDeleteButton.addEventListener('click', () => {
+            // Perform batch delete
+            performBatchDelete(selectedDocuments);
+            
+            // Hide modal
+            batchDeleteModal.hide();
+        });
+    }
+    
+    /**
+     * Toggle document selection in multi-select mode
+     */
+    function toggleDocumentSelection(documentId, selected) {
+        documentId = documentId.toString();
+        
+        if (selected) {
+            // Add to selection if not already there
+            if (!selectedDocuments.includes(documentId)) {
+                selectedDocuments.push(documentId);
+            }
+        } else {
+            // Remove from selection
+            selectedDocuments = selectedDocuments.filter(id => id !== documentId);
+        }
+        
+        // Update UI based on selection
+        updateSelectedCount();
+        
+        // Add or remove selected class from card
+        const card = documentList.querySelector(`.document-card[data-id="${documentId}"]`);
+        if (card) {
+            if (selected) {
+                card.classList.add('selected-document');
+            } else {
+                card.classList.remove('selected-document');
+            }
+        }
+    }
+    
+    /**
+     * Update the selected document count and button states
+     */
+    function updateSelectedCount() {
+        if (selectedCount) {
+            selectedCount.textContent = `${selectedDocuments.length} selected`;
+        }
+        
+        // Enable/disable batch action buttons based on selection
+        if (batchMoveBtn) {
+            batchMoveBtn.disabled = selectedDocuments.length === 0;
+        }
+        if (batchDeleteBtn) {
+            batchDeleteBtn.disabled = selectedDocuments.length === 0;
+        }
+    }
+    
+    /**
+     * Perform batch move operation
+     */
+    function performBatchMove(documentIds, collectionId) {
+        if (documentIds.length === 0) return;
+        
+        // Show loading state
+        documentList.innerHTML = `
+            <div class="text-center p-5">
+                <div class="spinner-border text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Moving documents...</p>
+            </div>
+        `;
+        
+        // Call API to move documents
+        fetch('/documents/api/documents/batch/move', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                document_ids: documentIds,
+                collection_id: collectionId === '' ? null : collectionId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to move documents');
+            }
+            
+            // Show success message
+            showAlert(`Successfully moved ${documentIds.length} documents`, 'success');
+            
+            // Reload documents and exit multi-select mode
+            multiSelectMode = false;
+            selectedDocuments = [];
+            toggleMultiSelectBtn.classList.remove('active');
+            multiSelectActions.classList.add('d-none');
+            loadDocuments();
+        })
+        .catch(error => {
+            console.error('Error moving documents:', error);
+            showAlert('Error moving documents: ' + error.message, 'danger');
+            
+            // Reload documents to restore state
+            loadDocuments();
+        });
+    }
+    
+    /**
+     * Perform batch delete operation
+     */
+    function performBatchDelete(documentIds) {
+        if (documentIds.length === 0) return;
+        
+        // Show loading state
+        documentList.innerHTML = `
+            <div class="text-center p-5">
+                <div class="spinner-border text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Deleting documents...</p>
+            </div>
+        `;
+        
+        // Call API to delete documents
+        fetch('/documents/api/documents/batch/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                document_ids: documentIds
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to delete documents');
+            }
+            
+            // Show success message
+            showAlert(`Successfully deleted ${documentIds.length} documents`, 'success');
+            
+            // Reload documents and exit multi-select mode
+            multiSelectMode = false;
+            selectedDocuments = [];
+            toggleMultiSelectBtn.classList.remove('active');
+            multiSelectActions.classList.add('d-none');
+            loadDocuments();
+        })
+        .catch(error => {
+            console.error('Error deleting documents:', error);
+            showAlert('Error deleting documents: ' + error.message, 'danger');
+            
+            // Reload documents to restore state
+            loadDocuments();
         });
     }
     
@@ -206,20 +464,38 @@ function initDocumentBrowser() {
                 ? `<span class="badge bg-primary collection-badge me-2"><i class="fas fa-folder me-1"></i>${escapeHtml(doc.collection.name)}</span>` 
                 : '';
             
+            // Check if this document is selected in multi-select mode
+            const isSelected = selectedDocuments.includes(doc.id.toString());
+            const multiSelectClass = isSelected ? 'selected-document' : '';
+            
             const card = document.createElement('div');
-            card.className = 'card document-card mb-3';
+            card.className = `card document-card mb-3 ${multiSelectClass}`;
             card.dataset.id = doc.id;
+            
+            // Add checkbox for multi-select mode
+            const checkboxHtml = multiSelectMode ? 
+                `<div class="document-checkbox">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" ${isSelected ? 'checked' : ''}>
+                    </div>
+                </div>` : '';
+            
             card.innerHTML = `
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
-                        <h5 class="card-title">${escapeHtml(doc.title)}</h5>
+                        <div class="d-flex align-items-start">
+                            ${checkboxHtml}
+                            <div>
+                                <h5 class="card-title">${escapeHtml(doc.title)}</h5>
+                                <h6 class="card-subtitle mb-2 text-muted">${escapeHtml(doc.authors || 'Unknown Authors')}</h6>
+                                <p class="card-text small text-muted">
+                                    ${doc.journal ? `${escapeHtml(doc.journal)} - ` : ''}
+                                    ${formatDate(doc.publication_date || doc.upload_date)}
+                                </p>
+                            </div>
+                        </div>
                         ${statusIcon}
                     </div>
-                    <h6 class="card-subtitle mb-2 text-muted">${escapeHtml(doc.authors || 'Unknown Authors')}</h6>
-                    <p class="card-text small text-muted">
-                        ${doc.journal ? `${escapeHtml(doc.journal)} - ` : ''}
-                        ${formatDate(doc.publication_date || doc.upload_date)}
-                    </p>
                     <div class="d-flex flex-wrap mt-2 align-items-center">
                         ${collectionBadge}
                         ${tags}
@@ -227,19 +503,42 @@ function initDocumentBrowser() {
                 </div>
             `;
             
-            // Add click handler
-            card.addEventListener('click', () => {
-                // Remove active class from all cards
-                document.querySelectorAll('.document-card').forEach(card => {
-                    card.classList.remove('border-primary');
+            // Add click handlers
+            if (multiSelectMode) {
+                // In multi-select mode, clicking the card toggles selection
+                card.addEventListener('click', (e) => {
+                    const checkbox = card.querySelector('input[type="checkbox"]');
+                    
+                    // Skip if the click was directly on the checkbox (it will handle its own state)
+                    if (e.target !== checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        toggleDocumentSelection(doc.id, checkbox.checked);
+                    }
                 });
                 
-                // Add active class to clicked card
-                card.classList.add('border-primary');
-                
-                // Show document details
-                showDocumentDetails(doc.id);
-            });
+                // Add specific handler for the checkbox to avoid double toggling
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent the card click handler from firing
+                        toggleDocumentSelection(doc.id, checkbox.checked);
+                    });
+                }
+            } else {
+                // In normal mode, clicking the card shows document details
+                card.addEventListener('click', () => {
+                    // Remove active class from all cards
+                    document.querySelectorAll('.document-card').forEach(card => {
+                        card.classList.remove('border-primary');
+                    });
+                    
+                    // Add active class to clicked card
+                    card.classList.add('border-primary');
+                    
+                    // Show document details
+                    showDocumentDetails(doc.id);
+                });
+            }
             
             documentList.appendChild(card);
         });
@@ -620,6 +919,44 @@ function initDocumentBrowser() {
         
         // Recursively check if this collection's parent is a descendant
         return collectionIsDescendantOf(collection.parent_id, potentialAncestorId);
+    }
+    
+    /**
+     * Populate a collections dropdown with all available collections
+     * @param {HTMLSelectElement} dropdown - The dropdown to populate
+     */
+    function populateCollectionsDropdown(dropdown) {
+        // Clear existing options (except the first one which is usually "Select a collection" or "None")
+        const firstOption = dropdown.options[0];
+        dropdown.innerHTML = '';
+        dropdown.appendChild(firstOption);
+        
+        // Add root option (no collection)
+        const rootOption = document.createElement('option');
+        rootOption.value = '';
+        rootOption.textContent = '-- No Collection --';
+        dropdown.appendChild(rootOption);
+        
+        // Add options for all collections
+        collections.forEach(collection => {
+            const option = document.createElement('option');
+            option.value = collection.id;
+            
+            // Add indentation to show hierarchy
+            let prefix = '';
+            let parent = collection;
+            let depth = 0;
+            
+            // Check for parent and add indentation
+            while (parent.parent_id && depth < 5) {
+                prefix += '— ';
+                parent = collections.find(c => c.id === parent.parent_id);
+                depth++;
+            }
+            
+            option.textContent = prefix + collection.name;
+            dropdown.appendChild(option);
+        });
     }
     
     /**

@@ -16,6 +16,28 @@
     background-color: rgba(13, 110, 253, 0.05);
 }
 
+/* Multi-select styles */
+.document-card.selected-document {
+    border-left-color: var(--bs-success);
+    background-color: rgba(25, 135, 84, 0.1);
+}
+
+.document-checkbox {
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.multi-select-actions {
+    padding: 10px;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+    background-color: rgba(13, 110, 253, 0.05);
+    border: 1px solid rgba(13, 110, 253, 0.1);
+}
+
 .document-list {
     max-height: 600px;
     overflow-y: auto;

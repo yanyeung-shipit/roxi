@@ -354,6 +354,152 @@ def delete_document(document_id):
             'success': False,
             'error': f"Failed to delete document: {str(e)}"
         }), 500
+        
+@document_routes.route('/api/documents/batch/move', methods=['POST'])
+def batch_move_documents():
+    """
+    Move multiple documents to a different collection
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'document_ids' not in data or 'collection_id' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'document_ids list and collection_id are required'
+            }), 400
+            
+        document_ids = data['document_ids']
+        collection_id = data['collection_id']
+        
+        if not isinstance(document_ids, list) or len(document_ids) == 0:
+            return jsonify({
+                'success': False,
+                'error': 'document_ids must be a non-empty list'
+            }), 400
+            
+        # If collection_id is not None, verify the collection exists
+        if collection_id is not None:
+            collection = Collection.query.get(collection_id)
+            if not collection:
+                return jsonify({
+                    'success': False,
+                    'error': f'Collection with ID {collection_id} not found'
+                }), 404
+        
+        # Get all documents
+        documents = Document.query.filter(Document.id.in_(document_ids)).all()
+        found_ids = [doc.id for doc in documents]
+        
+        # Check for documents that were not found
+        not_found = list(set(document_ids) - set(found_ids))
+        if not_found:
+            return jsonify({
+                'success': False,
+                'error': f'Documents with IDs {not_found} not found'
+            }), 404
+        
+        # Update each document's collection
+        moved_count = 0
+        for document in documents:
+            document.collection_id = collection_id
+            moved_count += 1
+            
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully moved {moved_count} documents to collection ID {collection_id if collection_id else "None (Root)"}'
+        })
+    except Exception as e:
+        db.session.rollback()
+        import logging
+        logging.exception(f"Error batch moving documents: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to move documents: {str(e)}"
+        }), 500
+
+@document_routes.route('/api/documents/batch/delete', methods=['POST'])
+def batch_delete_documents():
+    """
+    Delete multiple documents and all their associated data
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'document_ids' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'document_ids list is required'
+            }), 400
+            
+        document_ids = data['document_ids']
+        
+        if not isinstance(document_ids, list) or len(document_ids) == 0:
+            return jsonify({
+                'success': False,
+                'error': 'document_ids must be a non-empty list'
+            }), 400
+            
+        # Get all documents
+        documents = Document.query.filter(Document.id.in_(document_ids)).all()
+        found_ids = [doc.id for doc in documents]
+        
+        # Check for documents that were not found
+        not_found = list(set(document_ids) - set(found_ids))
+        if not_found:
+            return jsonify({
+                'success': False,
+                'error': f'Documents with IDs {not_found} not found'
+            }), 404
+            
+        # For each document, delete chunks, embeddings, queue entries, and files
+        deleted_count = 0
+        for document in documents:
+            # Get all chunk IDs for this document
+            chunks = TextChunk.query.filter_by(document_id=document.id).all()
+            chunk_ids = [chunk.id for chunk in chunks]
+            
+            # Delete vector embeddings for these chunks
+            if chunk_ids:
+                VectorEmbedding.query.filter(VectorEmbedding.chunk_id.in_(chunk_ids)).delete(synchronize_session=False)
+            
+            # Delete text chunks
+            TextChunk.query.filter_by(document_id=document.id).delete()
+            
+            # Delete queue entry if exists
+            ProcessingQueue.query.filter_by(document_id=document.id).delete()
+            
+            # Delete physical file if exists
+            try:
+                upload_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+                file_path = os.path.join(upload_folder, document.filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                # Log but continue with database deletion
+                import logging
+                logging.warning(f"Error deleting file for document {document.id}: {str(e)}")
+            
+            # Delete document record
+            db.session.delete(document)
+            deleted_count += 1
+            
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {deleted_count} documents and associated data'
+        })
+    except Exception as e:
+        db.session.rollback()
+        import logging
+        logging.exception(f"Error batch deleting documents: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to delete documents: {str(e)}"
+        }), 500
 
 @document_routes.route('/api/collections', methods=['GET'])
 def get_collections():
