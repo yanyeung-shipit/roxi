@@ -41,8 +41,8 @@ def list_documents():
                     Document.authors.ilike(search_term),
                     Document.journal.ilike(search_term),
                     Document.doi.ilike(search_term),
-                    # Add search by tag content
-                    Document.tags.any(lambda t: t.ilike(search_term))
+                    # Search by tag content - use a different approach without lambda function
+                    sa.func.array_to_string(Document.tags, ' ').ilike(search_term)
                 )
             )
             
