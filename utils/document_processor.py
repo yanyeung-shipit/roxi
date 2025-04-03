@@ -367,22 +367,31 @@ def generate_tags_from_content(text, document=None, metadata=None):
     if not tags:
         # Common patterns for keyword sections
         keyword_patterns = [
-            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n\.;]{5,200}?)(?:\n\n|\.\s|\.$)',
-            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+\n+([^\n\.;]{5,200}?)(?:\n\n|\.\s|\.$)',
-            r'(?:MeSH terms?|index terms?|subject headings?)[\s:]+([^\n\.;]{5,200}?)(?:\n\n|\.\s|\.$)'
+            # Standard format with space after period
+            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\.\s|\.$)',
+            # Format with periods directly followed by next keyword (common in some journals)
+            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\n)',
+            # Additional pattern for keywords with period separator (like "word1.word2.word3")
+            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([A-Za-z0-9\s\-.]{5,200}?)(?:\n\n|\n)',
+            # MeSH terms format
+            r'(?:MeSH terms?|index terms?|subject headings?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\.\s|\.$)'
         ]
         
         for pattern in keyword_patterns:
             keyword_match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if keyword_match:
                 keyword_text = keyword_match.group(1).strip()
-                # Keywords are usually separated by commas or semicolons
+                # Keywords are usually separated by commas, semicolons, or periods
                 if ',' in keyword_text:
                     keyword_list = [k.strip() for k in keyword_text.split(',')]
                 elif ';' in keyword_text:
                     keyword_list = [k.strip() for k in keyword_text.split(';')]
+                elif '.' in keyword_text and keyword_text.count('.') > 1:
+                    # Some journal formats use periods to separate keywords (e.g., "keyword1. keyword2. keyword3")
+                    # Only split by period if there are multiple periods (to avoid splitting legitimate phrases)
+                    keyword_list = [k.strip() for k in keyword_text.split('.') if k.strip()]
                 else:
-                    # If no separators, it might be one keyword or space-separated
+                    # If no recognized separators, it might be one keyword or space-separated
                     keyword_list = [keyword_text]
                 
                 # Add keywords found in the document
