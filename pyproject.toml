@@ -10,6 +10,7 @@ dependencies = [
     "flask-sqlalchemy>=3.1.1",
     "gunicorn>=23.0.0",
     "numpy>=2.2.4",
+    "openai>=1.70.0",
     "psutil>=7.0.0",
     "psycopg2-binary>=2.9.10",
     "pypdf2>=3.0.1",

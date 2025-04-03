@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 import datetime
 import random
@@ -264,8 +265,8 @@ def process_document(document_id):
         # Generate APA citation
         document.citation_apa = generate_apa_citation(document)
         
-        # Generate tags based on content
-        document.tags = generate_tags_from_content(text)
+        # Generate tags based on content, document metadata, and Crossref data
+        document.tags = generate_tags_from_content(text, document=document, metadata=metadata)
         
         # Split text into chunks
         from utils.pdf_processor import chunk_text
@@ -325,11 +326,112 @@ def process_document(document_id):
         
         return False
 
-def generate_tags_from_content(text):
-    """Generate tags from document content using NLP techniques"""
-    # This is a specialized tag generator for rheumatology documents
-    # It looks for specific terms relevant to rheumatology research
+def generate_tags_from_content(text, document=None, metadata=None):
+    """
+    Generate tags from document content using a multi-strategy approach
     
+    Priority order:
+    1. Metadata from Crossref/PubMed (if available)
+    2. Explicit keywords listed in the paper
+    3. Important words in title
+    4. Content-based keyword extraction
+    
+    Args:
+        text (str): The full text of the document
+        document (Document, optional): The document object with metadata
+        metadata (dict, optional): Metadata from Crossref/PubMed
+        
+    Returns:
+        list: Generated tags 
+    """
+    import re  # Explicitly import re to avoid LSP errors
+    
+    tags = []
+    
+    # STRATEGY 1: Use metadata from Crossref/PubMed if available
+    if metadata:
+        # Get keywords from Crossref (if available)
+        if 'subject' in metadata and isinstance(metadata['subject'], list):
+            # Crossref subjects are often in the form of keywords
+            for subject in metadata['subject'][:5]:  # Limit to 5 subjects
+                if isinstance(subject, str) and len(subject) < 50:  # Avoid extremely long subjects
+                    tags.append(subject)
+        
+        # Some Crossref entries have explicit keywords
+        if 'keyword' in metadata and isinstance(metadata['keyword'], list):
+            for keyword in metadata['keyword'][:5]:  # Limit to 5 keywords
+                if isinstance(keyword, str) and len(keyword) < 50:
+                    tags.append(keyword)
+    
+    # STRATEGY 2: Look for explicit keyword sections in the text
+    if not tags:
+        # Common patterns for keyword sections
+        keyword_patterns = [
+            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n\.;]{5,200}?)(?:\n\n|\.\s|\.$)',
+            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+\n+([^\n\.;]{5,200}?)(?:\n\n|\.\s|\.$)',
+            r'(?:MeSH terms?|index terms?|subject headings?)[\s:]+([^\n\.;]{5,200}?)(?:\n\n|\.\s|\.$)'
+        ]
+        
+        for pattern in keyword_patterns:
+            keyword_match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if keyword_match:
+                keyword_text = keyword_match.group(1).strip()
+                # Keywords are usually separated by commas or semicolons
+                if ',' in keyword_text:
+                    keyword_list = [k.strip() for k in keyword_text.split(',')]
+                elif ';' in keyword_text:
+                    keyword_list = [k.strip() for k in keyword_text.split(';')]
+                else:
+                    # If no separators, it might be one keyword or space-separated
+                    keyword_list = [keyword_text]
+                
+                # Add keywords found in the document
+                for keyword in keyword_list[:5]:  # Limit to 5 keywords
+                    if len(keyword) > 2 and len(keyword) < 50:  # Avoid very short or long keywords
+                        tags.append(keyword)
+                
+                # If we found keywords, no need to try other patterns
+                if tags:
+                    break
+    
+    # STRATEGY 3: Extract important words from title
+    if document and document.title and (len(tags) < 2):
+        title = document.title
+        
+        # Skip common words that aren't helpful as tags
+        common_words = {'the', 'a', 'an', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'to', 'and', 'or', 'from'}
+        
+        # Look for significant noun phrases in title (diseases, treatments, etc.)
+        important_patterns = [
+            # Disease patterns
+            r"(rheumatoid arthritis|systemic lupus|psoriatic arthritis|ankylosing spondylitis|osteoarthritis|gout|systemic sclerosis|vasculitis|sjogren's syndrome|polymyalgia rheumatica|polymyositis|fibromyalgia|interstitial lung disease)",
+            # Treatment patterns
+            r"(dmards?|biologics?|jak inhibitors?|corticosteroids?|nsaids?|methotrexate|hydroxychloroquine|rituximab)",
+            # Study type patterns
+            r"(guidelines?|recommendations?|consensus|meta-analysis|systematic review|cohort study|case report|case series|clinical trial)"
+        ]
+        
+        for pattern in important_patterns:
+            matches = re.finditer(pattern, title.lower())
+            for match in matches:
+                tag = match.group(1)
+                # Capitalize first letter of each word to make tags look nicer
+                tag = ' '.join(word.capitalize() for word in tag.split())
+                if tag not in tags:
+                    tags.append(tag)
+        
+        # If we still need more tags, extract significant words from title
+        if len(tags) < 2:
+            # Split title into words and filter out common words
+            title_words = [word.strip('.,;:()[]{}') for word in title.split()]
+            title_words = [word for word in title_words if len(word) > 3 and word.lower() not in common_words]
+            
+            # Add up to 2 significant words from title
+            for word in title_words[:2]:
+                if word and word not in tags:
+                    tags.append(word)
+    
+    # Define dictionaries needed for tag generation and classification
     # Common rheumatology disease categories
     diseases = {
         "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-", "seropositive arthritis"],
@@ -370,60 +472,68 @@ def generate_tags_from_content(text):
         "Review": ["review", "literature review"]
     }
     
-    # Convert text to lowercase for case-insensitive matching
-    text_lower = text.lower()
+    # Store category names for later use
+    all_disease_keys = list(diseases.keys())
+    all_treatment_keys = list(treatments.keys())
+    all_document_type_keys = list(document_types.keys())
+    all_domain_keys = all_disease_keys + all_treatment_keys + all_document_type_keys
     
-    # Find matches
-    tags = []
-    
-    # Check for disease terms
-    for disease, terms in diseases.items():
-        for term in terms:
-            if term in text_lower:
-                tags.append(disease)
-                break
-    
-    # Check for treatment terms
-    for treatment, terms in treatments.items():
-        for term in terms:
-            if term in text_lower:
-                tags.append(treatment)
-                break
-    
-    # Check for document type terms
-    for doc_type, terms in document_types.items():
-        for term in terms:
-            if term in text_lower:
-                tags.append(doc_type)
-                break
+    # STRATEGY 4: Content-based extraction using domain knowledge
+    # If we still don't have enough tags, fall back to the specialized approach
+    if len(tags) < 3:
+        # Convert text to lowercase for case-insensitive matching
+        text_lower = text.lower()
+        
+        # Find matches
+        content_tags = []
+        
+        # Check for disease terms
+        for disease, terms in diseases.items():
+            for term in terms:
+                if term in text_lower:
+                    content_tags.append(disease)
+                    break
+        
+        # Check for treatment terms
+        for treatment, terms in treatments.items():
+            for term in terms:
+                if term in text_lower:
+                    content_tags.append(treatment)
+                    break
+        
+        # Check for document type terms
+        for doc_type, terms in document_types.items():
+            for term in terms:
+                if term in text_lower:
+                    content_tags.append(doc_type)
+                    break
+        
+        # Add content-based tags that aren't already in our tags list
+        for tag in content_tags:
+            if tag not in tags:
+                tags.append(tag)
     
     # Limit to 5 tags maximum
     if len(tags) > 5:
-        # Prioritize disease tags, then treatment tags, then document type tags
-        disease_tags = [tag for tag in tags if tag in diseases.keys()]
-        treatment_tags = [tag for tag in tags if tag in treatments.keys()]
-        doc_type_tags = [tag for tag in tags if tag in document_types.keys()]
+        # If we have explicitly detected keywords, prioritize them
+        explicit_keywords = []
+        domain_tags = []
         
-        # Build final tag list with prioritization
-        final_tags = []
+        # Determine which tags came from explicit keywords vs. domain detection
+        for tag in tags:
+            if tag in all_domain_keys:
+                domain_tags.append(tag)
+            else:
+                explicit_keywords.append(tag)
         
-        # Add up to 2 disease tags
-        final_tags.extend(disease_tags[:2])
+        # Prioritize explicit keywords, then domain-specific tags
+        final_tags = explicit_keywords[:3]  # Take up to 3 explicit keywords
+        remaining_slots = 5 - len(final_tags)
         
-        # Add up to 2 treatment tags
-        if len(final_tags) < 4:
-            final_tags.extend(treatment_tags[:4-len(final_tags)])
+        if remaining_slots > 0:
+            final_tags.extend(domain_tags[:remaining_slots])
         
-        # Add 1 document type tag
-        if len(final_tags) < 5 and doc_type_tags:
-            final_tags.append(doc_type_tags[0])
-        
-        # If we still need more tags, add from the original list
-        if len(final_tags) < 5:
-            remaining_tags = [tag for tag in tags if tag not in final_tags]
-            final_tags.extend(remaining_tags[:5-len(final_tags)])
-        
-        tags = final_tags
+        tags = final_tags[:5]
     
     # If no tags were found, add some general ones
     if not tags:
