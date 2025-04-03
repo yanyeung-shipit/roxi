@@ -25,8 +25,13 @@ function initDocumentBrowser() {
     // Modal elements
     const editDocumentId = document.getElementById('editDocumentId');
     const editDocumentTitle = document.getElementById('editDocumentTitle');
+    const editDocumentAuthors = document.getElementById('editDocumentAuthors');
+    const editDocumentJournal = document.getElementById('editDocumentJournal');
+    const editDocumentDOI = document.getElementById('editDocumentDOI');
+    const editDocumentPublicationDate = document.getElementById('editDocumentPublicationDate');
     const editDocumentTags = document.getElementById('editDocumentTags');
     const editDocumentCollection = document.getElementById('editDocumentCollection');
+    const citationPreview = document.getElementById('citationPreview');
     const collectionsTableBody = document.getElementById('collectionsTableBody');
     const addCollectionBtn = document.getElementById('addCollectionBtn');
     const saveDocumentButton = document.getElementById('saveDocumentButton');
@@ -983,8 +988,27 @@ function initDocumentBrowser() {
                     // Fill form
                     editDocumentId.value = data.id;
                     editDocumentTitle.value = data.title || '';
+                    editDocumentAuthors.value = data.authors || '';
+                    editDocumentJournal.value = data.journal || '';
+                    editDocumentDOI.value = data.doi || '';
                     editDocumentTags.value = data.tags ? data.tags.join(', ') : '';
                     editDocumentCollection.value = data.collection ? data.collection.id : '';
+                    
+                    // Format publication date for date input (YYYY-MM-DD)
+                    if (data.publication_date) {
+                        const date = new Date(data.publication_date);
+                        const formattedDate = date.toISOString().split('T')[0];
+                        editDocumentPublicationDate.value = formattedDate;
+                    } else {
+                        editDocumentPublicationDate.value = '';
+                    }
+                    
+                    // Show current citation in preview
+                    if (data.citation_apa) {
+                        citationPreview.textContent = data.citation_apa;
+                    } else {
+                        citationPreview.textContent = 'Citation will be generated automatically after saving';
+                    }
                     
                     // Show modal
                     editDocumentModal.show();
@@ -1019,6 +1043,10 @@ function initDocumentBrowser() {
         saveDocumentButton.addEventListener('click', () => {
             const docId = editDocumentId.value;
             const title = editDocumentTitle.value.trim();
+            const authors = editDocumentAuthors.value.trim();
+            const journal = editDocumentJournal.value.trim();
+            const doi = editDocumentDOI.value.trim();
+            const publicationDate = editDocumentPublicationDate.value;
             const tags = editDocumentTags.value.trim()
                 .split(',')
                 .map(tag => tag.trim())
@@ -1033,8 +1061,16 @@ function initDocumentBrowser() {
             // Prepare data
             const data = {
                 title: title,
+                authors: authors,
+                journal: journal,
+                doi: doi,
                 tags: tags
             };
+            
+            // Add publication date if provided
+            if (publicationDate) {
+                data.publication_date = publicationDate;
+            }
             
             if (collectionId) {
                 data.collection_id = parseInt(collectionId);

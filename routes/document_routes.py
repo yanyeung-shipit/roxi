@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify, request
 import sqlalchemy as sa
 import os
 import shutil
+import datetime
 from app import db
 from models import Document, ProcessingQueue, TextChunk, VectorEmbedding, Collection
 
@@ -198,7 +199,7 @@ def get_document(document_id):
 @document_routes.route('/api/documents/<int:document_id>', methods=['PUT'])
 def update_document(document_id):
     """
-    Update document metadata including title and tags
+    Update document metadata including title, authors, journal, doi, publication date, and tags
     """
     try:
         document = Document.query.get(document_id)
@@ -210,14 +211,44 @@ def update_document(document_id):
             }), 404
         
         data = request.get_json()
+        metadata_changed = False
         
         # Update title if provided
         if 'title' in data:
             document.title = data['title']
-            
-            # Re-generate citation if title was changed
-            from utils.citation_generator import generate_apa_citation
-            document.citation_apa = generate_apa_citation(document)
+            metadata_changed = True
+        
+        # Update authors if provided
+        if 'authors' in data:
+            document.authors = data['authors']
+            metadata_changed = True
+        
+        # Update journal if provided
+        if 'journal' in data:
+            document.journal = data['journal']
+            metadata_changed = True
+        
+        # Update DOI if provided
+        if 'doi' in data:
+            document.doi = data['doi']
+            metadata_changed = True
+        
+        # Update publication date if provided
+        if 'publication_date' in data and data['publication_date']:
+            try:
+                # Handle different date formats
+                if 'T' in data['publication_date']:
+                    # ISO format with time
+                    document.publication_date = datetime.datetime.fromisoformat(data['publication_date'])
+                else:
+                    # Simple date format (YYYY-MM-DD)
+                    document.publication_date = datetime.datetime.strptime(data['publication_date'], '%Y-%m-%d')
+                metadata_changed = True
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid publication date format. Use YYYY-MM-DD.'
+                }), 400
         
         # Update tags if provided
         if 'tags' in data:
@@ -237,6 +268,11 @@ def update_document(document_id):
                     }), 404
             
             document.collection_id = collection_id
+            
+        # Re-generate citation if metadata was changed
+        if metadata_changed:
+            from utils.citation_generator import generate_apa_citation
+            document.citation_apa = generate_apa_citation(document)
         
         db.session.commit()
         
@@ -246,6 +282,11 @@ def update_document(document_id):
             'document': {
                 'id': document.id,
                 'title': document.title,
+                'authors': document.authors,
+                'journal': document.journal,
+                'doi': document.doi,
+                'publication_date': document.publication_date.isoformat() if document.publication_date else None,
+                'citation_apa': document.citation_apa,
                 'tags': document.tags,
                 'collection_id': document.collection_id if hasattr(document, 'collection_id') else None
             }

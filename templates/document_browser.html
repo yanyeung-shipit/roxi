@@ -178,7 +178,7 @@
 
 <!-- Edit Document Modal -->
 <div class="modal fade" id="editDocumentModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Edit Document</h5>
@@ -187,21 +187,55 @@
             <div class="modal-body">
                 <form id="editDocumentForm">
                     <input type="hidden" id="editDocumentId">
-                    <div class="mb-3">
-                        <label for="editDocumentTitle" class="form-label">Title</label>
-                        <input type="text" class="form-control" id="editDocumentTitle" required>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="editDocumentTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="editDocumentTitle" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="editDocumentCollection" class="form-label">Collection</label>
-                        <select class="form-select" id="editDocumentCollection">
-                            <option value="">None</option>
-                            <!-- Collections will be populated here -->
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentAuthors" class="form-label">Authors</label>
+                            <input type="text" class="form-control" id="editDocumentAuthors">
+                            <div class="form-text">Enter authors separated by commas</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentJournal" class="form-label">Journal</label>
+                            <input type="text" class="form-control" id="editDocumentJournal">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="editDocumentTags" class="form-label">Tags</label>
-                        <input type="text" class="form-control" id="editDocumentTags" placeholder="Enter tags separated by commas">
-                        <div class="form-text">Enter tags separated by commas (e.g., "rheumatoid arthritis, TNF inhibitors, clinical trial")</div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentPublicationDate" class="form-label">Publication Date</label>
+                            <input type="date" class="form-control" id="editDocumentPublicationDate">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentDOI" class="form-label">DOI</label>
+                            <input type="text" class="form-control" id="editDocumentDOI" placeholder="10.xxxx/xxxxx">
+                            <div class="form-text">Digital Object Identifier (e.g., 10.1016/j.jbspin.2021.105236)</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentCollection" class="form-label">Collection</label>
+                            <select class="form-select" id="editDocumentCollection">
+                                <option value="">None</option>
+                                <!-- Collections will be populated here -->
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentTags" class="form-label">Tags</label>
+                            <input type="text" class="form-control" id="editDocumentTags" placeholder="Enter tags separated by commas">
+                            <div class="form-text">Enter tags separated by commas (e.g., "rheumatoid arthritis, TNF inhibitors")</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Citation Preview</label>
+                            <div class="form-control bg-dark text-light p-3" id="citationPreview" style="min-height: 70px; font-style: italic;">
+                                Citation will be generated automatically after saving
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
