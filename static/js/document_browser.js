@@ -2,352 +2,1296 @@
  * Initialize the document browser functionality
  */
 function initDocumentBrowser() {
-    // DOM Elements
     const searchInput = document.getElementById('searchInput');
     const documentList = document.getElementById('documentList');
     const documentCount = document.getElementById('documentCount');
+    const documentDetails = document.getElementById('documentDetails');
     const pagination = document.getElementById('pagination');
     const collectionFilter = document.getElementById('collectionFilter');
+    const uploadCollection = document.getElementById('uploadCollection');
+    const actionButtons = document.querySelector('.action-buttons');
+    const newCollectionButton = document.getElementById('newCollectionButton');
+    const manageCollectionsButton = document.getElementById('manageCollectionsButton');
+    const editDocumentButton = document.getElementById('editDocumentButton');
+    const deleteDocumentButton = document.getElementById('deleteDocumentButton');
     const refreshDocumentsBtn = document.getElementById('refreshDocumentsBtn');
-    const batchActionsBtn = document.getElementById('batchActionsBtn');
-    const multiSelectControls = document.getElementById('multiSelectControls');
-    const selectedCount = document.getElementById('selectedCount');
-    const selectAllBtn = document.getElementById('selectAllBtn');
-    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
-    const batchMoveBtn = document.getElementById('batchMoveBtn');
-    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     
     // Modals
-    const editDocumentModal = document.getElementById('editDocumentModal') ? 
-        new bootstrap.Modal(document.getElementById('editDocumentModal')) : null;
-    const collectionModal = document.getElementById('collectionModal') ? 
-        new bootstrap.Modal(document.getElementById('collectionModal')) : null;
-    const manageCollectionsModal = document.getElementById('manageCollectionsModal') ? 
-        new bootstrap.Modal(document.getElementById('manageCollectionsModal')) : null;
-    const deleteConfirmModal = document.getElementById('deleteConfirmModal') ? 
-        new bootstrap.Modal(document.getElementById('deleteConfirmModal')) : null;
-    const batchMoveModal = document.getElementById('batchMoveModal') ? 
-        new bootstrap.Modal(document.getElementById('batchMoveModal')) : null;
+    const editDocumentModal = new bootstrap.Modal(document.getElementById('editDocumentModal'));
+    const collectionModal = new bootstrap.Modal(document.getElementById('collectionModal'));
+    const manageCollectionsModal = new bootstrap.Modal(document.getElementById('manageCollectionsModal'));
+    const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
     
-    // State variables
-    let documents = [];
-    let totalDocuments = 0;
+    // Modal elements
+    const editDocumentId = document.getElementById('editDocumentId');
+    const editDocumentTitle = document.getElementById('editDocumentTitle');
+    const editDocumentAuthors = document.getElementById('editDocumentAuthors');
+    const editDocumentJournal = document.getElementById('editDocumentJournal');
+    const editDocumentDOI = document.getElementById('editDocumentDOI');
+    const editDocumentPublicationDate = document.getElementById('editDocumentPublicationDate');
+    const editDocumentTags = document.getElementById('editDocumentTags');
+    const editDocumentCollection = document.getElementById('editDocumentCollection');
+    const citationPreview = document.getElementById('citationPreview');
+    const collectionsTableBody = document.getElementById('collectionsTableBody');
+    const addCollectionBtn = document.getElementById('addCollectionBtn');
+    const saveDocumentButton = document.getElementById('saveDocumentButton');
+    
+    const collectionId = document.getElementById('collectionId');
+    const collectionName = document.getElementById('collectionName');
+    const collectionDescription = document.getElementById('collectionDescription');
+    const collectionParent = document.getElementById('collectionParent');
+    const collectionModalTitle = document.getElementById('collectionModalTitle');
+    const saveCollectionButton = document.getElementById('saveCollectionButton');
+    const deleteCollectionButton = document.getElementById('deleteCollectionButton');
+    
+    const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
+    const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+    const viewPdfButton = document.getElementById('viewPdfButton');
+    
+    // State
     let currentPage = 1;
-    let pageSize = 10;
-    let totalPages = 0;
-    let searchTerm = '';
-    let activeTag = null;
+    let totalPages = 1;
     let activeCollection = '';
+    let searchTerm = '';
+    let documents = [];
+    let collections = [];
     let currentDocumentId = null;
-    let multiSelectMode = false;
-    let selectedDocuments = new Set();
+    let deleteType = null; // 'document' or 'collection'
+    let deleteId = null;
     
-    // Fetch and display documents
+    // Add event listener for refresh button
+    if (refreshDocumentsBtn) {
+        refreshDocumentsBtn.addEventListener('click', function() {
+            // Add spinning animation to refresh button when clicked
+            refreshDocumentsBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>';
+            refreshDocumentsBtn.disabled = true;
+            
+            // Reload documents
+            loadDocuments();
+            
+            // Reset button after a short delay
+            setTimeout(() => {
+                refreshDocumentsBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                refreshDocumentsBtn.disabled = false;
+            }, 1000);
+        });
+    }
+    
+    // Initial load
+    loadDocuments();
+    loadCollections();
+    
+    // Handle search input
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(function() {
+            searchTerm = searchInput.value.trim();
+            currentPage = 1;
+            loadDocuments();
+        }, 300));
+    }
+    
+    /**
+     * Load documents with current filters and pagination
+     */
     function loadDocuments() {
-        if (documentList) {
-            documentList.innerHTML = '<div class="text-center my-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading documents...</p></div>';
-        }
+        // Show loading state
+        documentList.innerHTML = `
+            <div class="text-center p-5">
+                <div class="spinner-border text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Loading documents...</p>
+            </div>
+        `;
         
         // Build query parameters
-        let params = new URLSearchParams({
-            page: currentPage,
-            per_page: pageSize
-        });
-        
-        if (searchTerm) {
-            params.append('search', searchTerm);
-        }
-        
-        if (activeTag) {
-            params.append('tag', activeTag);
-        }
+        let params = new URLSearchParams();
+        params.append('page', currentPage);
+        params.append('per_page', 10);
         
         if (activeCollection) {
             params.append('collection_id', activeCollection);
         }
         
-        // Fetch documents from API
-        fetch('/documents/api/documents?' + params.toString())
+        if (searchTerm) {
+            params.append('search', searchTerm);
+        }
+        
+        // Fetch documents
+        fetch(`/documents/api/documents?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
-                documents = data.documents;
-                totalDocuments = data.total;
-                totalPages = Math.ceil(totalDocuments / pageSize);
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load documents');
+                }
                 
-                renderDocuments();
+                // Store data
+                documents = data.documents;
+                totalPages = data.pages;
+                currentPage = data.current_page;
+                
+                // Update count badge
+                documentCount.textContent = `${data.total} documents`;
+                
+                // Clear document list
+                documentList.innerHTML = '';
+                
+                // Handle empty results
+                if (documents.length === 0) {
+                    documentList.innerHTML = `
+                        <div class="text-center p-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <p class="text-muted">No documents found</p>
+                            <a href="#uploadForm" class="btn btn-outline-primary mt-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-upload me-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                Upload Documents
+                            </a>
+                        </div>
+                    `;
+                    
+                    // Clear document details
+                    documentDetails.innerHTML = `
+                        <div class="text-center p-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <p class="text-muted">No documents found</p>
+                        </div>
+                    `;
+                    
+                    // Hide pagination
+                    pagination.innerHTML = '';
+                    
+                    return;
+                }
+                
+                // Render documents
+                renderDocuments(documents);
+                
+                // Render pagination
                 renderPagination();
                 
-                if (documentCount) {
-                    documentCount.textContent = totalDocuments;
+                // Select first document by default
+                if (documents.length > 0) {
+                    showDocumentDetails(documents[0].id);
                 }
             })
             .catch(error => {
                 console.error('Error loading documents:', error);
-                if (documentList) {
-                    documentList.innerHTML = '<div class="alert alert-danger">Error loading documents. Please try again.</div>';
+                documentList.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Error loading documents.</strong> Please try again.
+                    </div>
+                `;
+            });
+    }
+    
+    /**
+     * Render documents in the document list
+     */
+    function renderDocuments(documents) {
+        // Clear document list
+        documentList.innerHTML = '';
+        
+        // Create document cards
+        documents.forEach(doc => {
+            const tags = doc.tags ? doc.tags.slice(0, 5).map(tag => 
+                `<span class="badge bg-secondary tag-badge">${escapeHtml(tag)}</span>`
+            ).join('') : '';
+            
+            const statusIcon = doc.processed ? 
+                '<span class="document-status-processed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span>' : 
+                '<span class="document-status-pending"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>';
+            
+            // Show collection badge if available
+            const collectionBadge = doc.collection 
+                ? `<span class="badge bg-primary collection-badge me-2"><i class="fas fa-folder me-1"></i>${escapeHtml(doc.collection.name)}</span>` 
+                : '';
+            
+            const card = document.createElement('div');
+            card.className = 'card document-card mb-3';
+            card.dataset.id = doc.id;
+            card.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h5 class="card-title">${escapeHtml(doc.title)}</h5>
+                        ${statusIcon}
+                    </div>
+                    <h6 class="card-subtitle mb-2 text-muted">${escapeHtml(doc.authors || 'Unknown Authors')}</h6>
+                    <p class="card-text small text-muted">
+                        ${doc.journal ? `${escapeHtml(doc.journal)} - ` : ''}
+                        ${formatDate(doc.publication_date || doc.upload_date)}
+                    </p>
+                    <div class="d-flex flex-wrap mt-2 align-items-center">
+                        ${collectionBadge}
+                        ${tags}
+                    </div>
+                </div>
+            `;
+            
+            // Add click handler
+            card.addEventListener('click', () => {
+                // Remove active class from all cards
+                document.querySelectorAll('.document-card').forEach(card => {
+                    card.classList.remove('border-primary');
+                });
+                
+                // Add active class to clicked card
+                card.classList.add('border-primary');
+                
+                // Show document details
+                showDocumentDetails(doc.id);
+            });
+            
+            documentList.appendChild(card);
+        });
+    }
+    
+    /**
+     * Load all available tags
+     */
+    function loadTags() {
+        fetch('/documents/api/tags')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load tags');
+                }
+                renderTags(data.tags);
+            })
+            .catch(error => {
+                console.error('Error loading tags:', error);
+                tagFilters.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Error loading tags.</strong> Please try again.
+                    </div>
+                `;
+            });
+    }
+    
+    /**
+     * Render tag filters
+     */
+    function renderTags(tags) {
+        // Clear tag filters
+        tagFilters.innerHTML = '';
+        
+        // Handle empty tags
+        if (tags.length === 0) {
+            tagFilters.innerHTML = `
+                <p class="text-muted">No tags available</p>
+            `;
+            return;
+        }
+        
+        // Create "All" tag
+        const allTag = document.createElement('span');
+        allTag.className = 'badge bg-primary tag-badge active';
+        allTag.textContent = 'All';
+        allTag.addEventListener('click', () => {
+            activeTag = null;
+            updateActiveTag(null);
+            currentPage = 1;
+            loadDocuments();
+        });
+        tagFilters.appendChild(allTag);
+        
+        // Create tag badges
+        tags.forEach(tag => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-secondary tag-badge';
+            badge.textContent = tag;
+            badge.addEventListener('click', () => {
+                activeTag = tag;
+                updateActiveTag(tag);
+                currentPage = 1;
+                loadDocuments();
+            });
+            tagFilters.appendChild(badge);
+        });
+    }
+    
+    /**
+     * Update the active tag in the UI
+     */
+    function updateActiveTag(activeTag) {
+        // Remove active class from all tags
+        document.querySelectorAll('.tag-badge').forEach(tag => {
+            tag.classList.remove('active');
+            tag.classList.remove('bg-primary');
+            tag.classList.add('bg-secondary');
+        });
+        
+        // Add active class to clicked tag or "All" if null
+        if (activeTag === null) {
+            const allTag = tagFilters.querySelector('.tag-badge');
+            if (allTag) {
+                allTag.classList.add('active');
+                allTag.classList.add('bg-primary');
+                allTag.classList.remove('bg-secondary');
+            }
+        } else {
+            const tags = Array.from(tagFilters.querySelectorAll('.tag-badge'));
+            const tag = tags.find(tag => tag.textContent === activeTag);
+            if (tag) {
+                tag.classList.add('active');
+                tag.classList.add('bg-primary');
+                tag.classList.remove('bg-secondary');
+            }
+        }
+    }
+    
+    /**
+     * Show document details
+     */
+    function showDocumentDetails(documentId) {
+        // Store current document ID
+        currentDocumentId = documentId;
+        
+        // Show loading state
+        documentDetails.innerHTML = `
+            <div class="text-center p-5">
+                <div class="spinner-border text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Loading document details...</p>
+            </div>
+        `;
+        
+        // Hide action buttons while loading
+        if (actionButtons) {
+            actionButtons.classList.add('d-none');
+        }
+        
+        // Fetch document details
+        fetch(`/documents/api/documents/${documentId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load document details');
+                }
+                
+                const doc = data;
+                // Format tags
+                const tags = doc.tags ? doc.tags.map(tag => 
+                    `<span class="badge bg-secondary tag-badge me-1">${escapeHtml(tag)}</span>`
+                ).join('') : 'No tags';
+                
+                // Format status
+                const status = doc.processed ? 
+                    '<span class="badge bg-success">Processed</span>' : 
+                    '<span class="badge bg-warning">Processing</span>';
+                
+                // Get collection info
+                const collectionName = doc.collection ? 
+                    `<a href="#" class="collection-link" data-collection-id="${doc.collection.id}">${escapeHtml(doc.collection.name)}</a> 
+                    <a href="#" class="collection-edit-link ms-2" data-collection-id="${doc.collection.id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit-2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                    </a>` : 
+                    'None';
+                
+                // Format document details
+                documentDetails.innerHTML = `
+                    <h5 class="mb-3">${escapeHtml(doc.title)}</h5>
+                    
+                    <dl class="metadata-list">
+                        <dt>Authors</dt>
+                        <dd>${escapeHtml(doc.authors || 'Unknown')}</dd>
+                        
+                        <dt>Journal</dt>
+                        <dd>${escapeHtml(doc.journal || 'N/A')}</dd>
+                        
+                        <dt>Publication Date</dt>
+                        <dd>${formatDate(doc.publication_date) || 'Unknown'}</dd>
+                        
+                        <dt>DOI</dt>
+                        <dd>${doc.doi ? `<a href="https://doi.org/${doc.doi}" target="_blank">${doc.doi}</a>` : 'N/A'}</dd>
+                        
+                        <dt>Upload Date</dt>
+                        <dd>${formatDate(doc.upload_date)}</dd>
+                        
+                        <dt>Collection</dt>
+                        <dd>${collectionName}</dd>
+                        
+                        <dt>Status</dt>
+                        <dd>${status}</dd>
+                        
+                        <dt>Tags</dt>
+                        <dd class="mb-3">${tags}</dd>
+                    </dl>
+                    
+                    ${doc.citation_apa ? `
+                        <h6 class="mt-4 mb-2">Citation</h6>
+                        <div class="citation-box small">
+                            ${escapeHtml(doc.citation_apa)}
+                        </div>
+                    ` : ''}
+                `;
+                
+                // Show action buttons
+                if (actionButtons) {
+                    actionButtons.classList.remove('d-none');
+                }
+                
+                // Add click handlers for collection links
+                const collectionLinks = documentDetails.querySelectorAll('.collection-link');
+                collectionLinks.forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const collectionId = link.dataset.collectionId;
+                        // Update collection filter
+                        if (collectionFilter) {
+                            collectionFilter.value = collectionId;
+                            // Trigger change event
+                            const event = new Event('change');
+                            collectionFilter.dispatchEvent(event);
+                        }
+                    });
+                });
+                
+                // Add click handlers for collection edit links
+                const collectionEditLinks = documentDetails.querySelectorAll('.collection-edit-link');
+                collectionEditLinks.forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const id = link.dataset.collectionId;
+                        
+                        // Get collection data
+                        fetch(`/documents/api/collections/${id}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (!data.success) {
+                                    throw new Error(data.error || 'Failed to load collection data');
+                                }
+                                
+                                // Update form fields
+                                collectionId.value = data.collection.id;
+                                collectionName.value = data.collection.name;
+                                collectionDescription.value = data.collection.description || '';
+                                collectionParent.value = data.collection.parent_id || '';
+                                
+                                // Update modal title
+                                collectionModalTitle.textContent = 'Edit Collection';
+                                
+                                // Show delete button for existing collections
+                                deleteCollectionButton.classList.remove('d-none');
+                                
+                                // Show modal
+                                collectionModal.show();
+                            })
+                            .catch(error => {
+                                console.error('Error loading collection data:', error);
+                                showAlert('Error loading collection data. Please try again.', 'danger');
+                            });
+                    });
+                });
+            })
+            .catch(error => {
+                console.error('Error loading document details:', error);
+                documentDetails.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Error loading document details.</strong> Please try again.
+                    </div>
+                `;
+                
+                // Hide action buttons
+                if (actionButtons) {
+                    actionButtons.classList.add('d-none');
                 }
             });
     }
     
-    // Render document cards
-    function renderDocuments() {
-        if (!documentList) return;
-        
-        if (documents.length === 0) {
-            documentList.innerHTML = '<div class="alert alert-info">No documents found. Upload some documents to get started.</div>';
-            return;
-        }
-        
-        let html = '<div class="row">';
-        
-        documents.forEach(doc => {
-            let date = doc.upload_date ? new Date(doc.upload_date).toLocaleDateString() : 'Unknown';
-            let tags = doc.tags || [];
-            
-            html += `
-                <div class="col-md-12 mb-3">
-                    <div class="card document-card h-100" data-id="${doc.id}">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start">
-                                ${multiSelectMode ? `
-                                    <div class="form-check">
-                                        <input class="form-check-input document-checkbox" type="checkbox" value="${doc.id}" id="doc-check-${doc.id}">
-                                    </div>
-                                ` : ''}
-                                <div class="flex-grow-1 ${multiSelectMode ? 'ms-2' : ''}">
-                                    <h5 class="card-title">${doc.title || doc.filename}</h5>
-                                    <p class="card-text text-muted">${doc.authors || 'Unknown authors'}</p>
-                                    <p class="card-text text-muted small">${doc.journal || ''} ${doc.publication_date ? new Date(doc.publication_date).getFullYear() : ''}</p>
-                                </div>
-                            </div>
-                            <div class="d-flex flex-wrap mt-2">
-                                ${tags.map(tag => `<span class="badge bg-info me-1 mb-1">${tag}</span>`).join('')}
-                            </div>
-                            <div class="mt-2">
-                                <small class="text-muted">Uploaded: ${date}</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        documentList.innerHTML = html;
-        
-        // Add event listeners to cards
-        document.querySelectorAll('.document-card').forEach(card => {
-            const id = card.dataset.id;
-            const checkbox = card.querySelector('.document-checkbox');
-            
-            if (multiSelectMode && checkbox) {
-                // Initialize checkbox state
-                checkbox.checked = selectedDocuments.has(id);
-                
-                checkbox.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    if (checkbox.checked) {
-                        selectedDocuments.add(id);
-                    } else {
-                        selectedDocuments.delete(id);
-                    }
-                    updateSelectedCount();
-                });
-                
-                card.addEventListener('click', (e) => {
-                    if (e.target !== checkbox) {
-                        checkbox.checked = !checkbox.checked;
-                        if (checkbox.checked) {
-                            selectedDocuments.add(id);
-                        } else {
-                            selectedDocuments.delete(id);
-                        }
-                        updateSelectedCount();
-                    }
-                });
-            } else {
-                card.addEventListener('click', () => {
-                    // Placeholder for fetchDocumentDetails - will add implementation later
-                    console.log('Viewing document details for ID:', id);
-                });
-            }
-        });
-    }
-    
-    // Render pagination controls
+    /**
+     * Render pagination controls
+     */
     function renderPagination() {
-        if (!pagination) return;
-        
+        // Clear pagination
         pagination.innerHTML = '';
         
+        // Skip if only one page
         if (totalPages <= 1) {
             return;
         }
         
-        let html = '<ul class="pagination justify-content-center">';
-        
         // Previous button
-        html += `
-            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" aria-label="Previous" data-page="${currentPage - 1}">
-                    <span aria-hidden="true">&laquo;</span>
-                </a>
-            </li>
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `
+            <a class="page-link" href="#" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
         `;
+        prevLi.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (currentPage > 1) {
+                currentPage--;
+                loadDocuments();
+            }
+        });
+        pagination.appendChild(prevLi);
         
-        // Page numbers
+        // Page buttons
         let startPage = Math.max(1, currentPage - 2);
         let endPage = Math.min(totalPages, startPage + 4);
         
-        if (endPage - startPage < 4) {
+        // Ensure we show at least 5 pages if available
+        if (endPage - startPage < 4 && totalPages > 4) {
             startPage = Math.max(1, endPage - 4);
         }
         
         for (let i = startPage; i <= endPage; i++) {
-            html += `
-                <li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" data-page="${i}">${i}</a>
-                </li>
-            `;
+            const pageLi = document.createElement('li');
+            pageLi.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            pageLi.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            pageLi.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentPage = i;
+                loadDocuments();
+            });
+            pagination.appendChild(pageLi);
         }
         
         // Next button
-        html += `
-            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" aria-label="Next" data-page="${currentPage + 1}">
-                    <span aria-hidden="true">&raquo;</span>
-                </a>
-            </li>
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `
+            <a class="page-link" href="#" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        `;
+        nextLi.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadDocuments();
+            }
+        });
+        pagination.appendChild(nextLi);
+    }
+    
+    /**
+     * Format a date string
+     */
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        
+        const date = new Date(dateString);
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+            return 'Unknown date';
+        }
+        
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    }
+    
+    /**
+     * Debounce function for input events
+     */
+    function debounce(func, wait) {
+        let timeout;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                func.apply(context, args);
+            }, wait);
+        };
+    }
+    
+    /**
+     * Check if a collection is a descendant of another collection
+     * @param {number} collectionId - The ID of the collection to check
+     * @param {number} potentialAncestorId - The ID of the potential ancestor
+     * @returns {boolean} - True if collectionId is a descendant of potentialAncestorId
+     */
+    function collectionIsDescendantOf(collectionId, potentialAncestorId) {
+        const collection = collections.find(c => c.id === collectionId);
+        if (!collection) return false;
+        
+        // If this collection has the potential ancestor as parent, it's a descendant
+        if (collection.parent_id === potentialAncestorId) return true;
+        
+        // If this collection has no parent, it's not a descendant
+        if (!collection.parent_id) return false;
+        
+        // Recursively check if this collection's parent is a descendant
+        return collectionIsDescendantOf(collection.parent_id, potentialAncestorId);
+    }
+    
+    /**
+     * Populate the collections table for the manage collections modal
+     */
+    function populateCollectionsTable() {
+        if (!collectionsTableBody) return;
+        
+        // Show loading state
+        collectionsTableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-2">Loading collections...</span>
+                </td>
+            </tr>
         `;
         
-        html += '</ul>';
-        pagination.innerHTML = html;
-        
-        // Add event listeners to pagination links
-        document.querySelectorAll('.page-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const page = parseInt(link.dataset.page);
-                if (page >= 1 && page <= totalPages) {
-                    currentPage = page;
-                    loadDocuments();
+        // Get the latest collections data
+        fetch('/documents/api/collections')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load collections');
                 }
+                
+                // Clear the table body
+                collectionsTableBody.innerHTML = '';
+                
+                if (data.collections.length === 0) {
+                    collectionsTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center">
+                                <p class="text-muted my-3">No collections found</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Add each collection to the table
+                data.collections.forEach(collection => {
+                    const row = document.createElement('tr');
+                    
+                    // Indentation based on level
+                    const indentation = collection.level > 0 
+                        ? `<span class="ms-${collection.level * 3}"></span>` 
+                        : '';
+                    const levelPrefix = collection.level > 0 ? '↳ ' : '';
+                    
+                    row.innerHTML = `
+                        <td>${indentation}${levelPrefix}${escapeHtml(collection.name)}</td>
+                        <td>${escapeHtml(collection.full_path)}</td>
+                        <td>${collection.total_document_count}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-secondary edit-collection-btn" data-id="${collection.id}">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button type="button" class="btn btn-outline-danger delete-collection-btn" data-id="${collection.id}">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    
+                    collectionsTableBody.appendChild(row);
+                });
+                
+                // Add event listeners to the edit/delete buttons
+                collectionsTableBody.querySelectorAll('.edit-collection-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.dataset.id;
+                        
+                        // Hide manage collections modal
+                        manageCollectionsModal.hide();
+                        
+                        // Load collection data
+                        fetch(`/documents/api/collections/${id}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (!data.success) {
+                                    throw new Error(data.error || 'Failed to load collection data');
+                                }
+                                
+                                // Update form fields
+                                collectionId.value = data.collection.id;
+                                collectionName.value = data.collection.name;
+                                collectionDescription.value = data.collection.description || '';
+                                collectionParent.value = data.collection.parent_id || '';
+                                
+                                // Update modal title
+                                collectionModalTitle.textContent = 'Edit Collection';
+                                
+                                // Show delete button for existing collections
+                                deleteCollectionButton.classList.remove('d-none');
+                                
+                                // Show modal
+                                collectionModal.show();
+                            })
+                            .catch(error => {
+                                console.error('Error loading collection data:', error);
+                                showAlert('Error loading collection data. Please try again.', 'danger');
+                            });
+                    });
+                });
+                
+                collectionsTableBody.querySelectorAll('.delete-collection-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.dataset.id;
+                        
+                        // Hide manage collections modal
+                        manageCollectionsModal.hide();
+                        
+                        // Setup confirmation modal
+                        deleteType = 'collection';
+                        deleteId = id;
+                        deleteConfirmMessage.textContent = 'Are you sure you want to delete this collection? Documents in this collection will not be deleted, but they will no longer be associated with any collection. This action cannot be undone.';
+                        
+                        // Show confirmation modal
+                        deleteConfirmModal.show();
+                    });
+                });
+            })
+            .catch(error => {
+                console.error('Error loading collections:', error);
+                collectionsTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center">
+                            <div class="alert alert-danger">
+                                <strong>Error loading collections.</strong> Please try again.
+                            </div>
+                        </td>
+                    </tr>
+                `;
             });
-        });
     }
     
-    // Handle multi-select mode
-    function toggleMultiSelectMode() {
-        multiSelectMode = !multiSelectMode;
-        
-        if (multiSelectControls) {
-            multiSelectControls.style.display = multiSelectMode ? 'flex' : 'none';
-        }
-        
-        if (batchActionsBtn) {
-            batchActionsBtn.textContent = multiSelectMode ? 'Cancel Selection' : 'Batch Actions';
-        }
-        
-        selectedDocuments.clear();
-        updateSelectedCount();
-        loadDocuments();
+    /**
+     * Load collections
+     */
+    function loadCollections() {
+        fetch('/documents/api/collections')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load collections');
+                }
+                
+                collections = data.collections;
+                
+                // Sort collections by parent_id (null first), then by level, then by name
+                collections.sort((a, b) => {
+                    // First sort by level
+                    if (a.level !== b.level) return a.level - b.level;
+                    
+                    // Then by name for collections at the same level
+                    return a.name.localeCompare(b.name);
+                });
+                
+                // Update collection filters
+                if (collectionFilter) {
+                    // Save current value
+                    const currentValue = collectionFilter.value;
+                    
+                    // Clear options except first one (All Collections)
+                    while (collectionFilter.options.length > 1) {
+                        collectionFilter.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        // Show document count
+                        const docCount = collection.total_document_count > 0 ? 
+                            ` (${collection.total_document_count})` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}${docCount}`;
+                        collectionFilter.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        collectionFilter.value = currentValue;
+                    }
+                }
+                
+                // Update upload collection dropdown
+                if (uploadCollection) {
+                    // Save current value
+                    const currentValue = uploadCollection.value;
+                    
+                    // Clear options except first one (None)
+                    while (uploadCollection.options.length > 1) {
+                        uploadCollection.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}`;
+                        uploadCollection.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        uploadCollection.value = currentValue;
+                    }
+                }
+                
+                // Update edit document collection dropdown
+                if (editDocumentCollection) {
+                    // Save current value
+                    const currentValue = editDocumentCollection.value;
+                    
+                    // Clear options except first one (None)
+                    while (editDocumentCollection.options.length > 1) {
+                        editDocumentCollection.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}`;
+                        editDocumentCollection.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        editDocumentCollection.value = currentValue;
+                    }
+                }
+                
+                // Update collection parent dropdown
+                if (collectionParent) {
+                    // Save current value
+                    const currentValue = collectionParent.value;
+                    
+                    // Clear options except first one (None/Root)
+                    while (collectionParent.options.length > 1) {
+                        collectionParent.remove(1);
+                    }
+                    
+                    // Add collection options with indentation for hierarchy
+                    collections.forEach(collection => {
+                        // Skip the current collection if editing (can't be its own parent)
+                        if (collectionId.value && collection.id.toString() === collectionId.value) {
+                            return;
+                        }
+                        
+                        // Skip this collection's descendants if editing (avoid circular references)
+                        if (collectionId.value && collectionIsDescendantOf(collection.id, parseInt(collectionId.value))) {
+                            return;
+                        }
+                        
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        
+                        // Add proper indentation based on level
+                        const indentation = '\u00A0\u00A0\u00A0\u00A0'.repeat(collection.level);
+                        const prefix = collection.level > 0 ? `${indentation}↳ ` : '';
+                        
+                        option.textContent = `${prefix}${collection.name}`;
+                        collectionParent.appendChild(option);
+                    });
+                    
+                    // Restore selected value if still exists
+                    if (currentValue) {
+                        const optionExists = Array.from(collectionParent.options).some(opt => opt.value === currentValue);
+                        collectionParent.value = optionExists ? currentValue : "";
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading collections:', error);
+                // Show error toast
+                showAlert('Error loading collections. Please try again.', 'danger');
+            });
     }
     
-    function updateSelectedCount() {
-        if (selectedCount) {
-            selectedCount.textContent = selectedDocuments.size;
-        }
-        
-        // Enable/disable batch action buttons based on selection
-        if (batchMoveBtn) {
-            batchMoveBtn.disabled = selectedDocuments.size === 0;
-        }
-        
-        if (batchDeleteBtn) {
-            batchDeleteBtn.disabled = selectedDocuments.size === 0;
-        }
-    }
+    // Initial collections load
+    loadCollections();
     
-    function selectAllDocuments() {
-        const checkboxes = document.querySelectorAll('.document-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = true;
-            selectedDocuments.add(checkbox.value);
-        });
-        updateSelectedCount();
-    }
-    
-    function clearDocumentSelection() {
-        const checkboxes = document.querySelectorAll('.document-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = false;
-        });
-        selectedDocuments.clear();
-        updateSelectedCount();
-    }
-    
-    // Set up event listeners
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            searchTerm = searchInput.value.trim();
-            currentPage = 1;
-            loadDocuments();
-        });
-    }
-    
+    // Add event listeners for collection filter
     if (collectionFilter) {
-        collectionFilter.addEventListener('change', function() {
+        collectionFilter.addEventListener('change', () => {
             activeCollection = collectionFilter.value;
             currentPage = 1;
             loadDocuments();
         });
     }
     
-    if (refreshDocumentsBtn) {
-        refreshDocumentsBtn.addEventListener('click', function() {
-            refreshDocumentsBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>';
-            loadDocuments();
+    // Add event listeners for modals and buttons
+    
+    // New Collection button
+    // Manage Collections Button
+    if (manageCollectionsButton) {
+        manageCollectionsButton.addEventListener('click', () => {
+            // Populate the collections table
+            populateCollectionsTable();
+            // Show the modal
+            manageCollectionsModal.show();
+        });
+    }
+    
+    // Add Collection button in manage collections modal
+    if (addCollectionBtn) {
+        addCollectionBtn.addEventListener('click', () => {
+            // Hide manage collections modal
+            manageCollectionsModal.hide();
             
-            // Reset icon after a short delay
-            setTimeout(() => {
-                refreshDocumentsBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
-            }, 1000);
+            // Reset form and show new collection modal
+            collectionId.value = '';
+            collectionName.value = '';
+            collectionDescription.value = '';
+            collectionParent.value = '';
+            
+            // Update modal title
+            collectionModalTitle.textContent = 'New Collection';
+            
+            // Hide delete button for new collections
+            deleteCollectionButton.classList.add('d-none');
+            
+            // Show modal
+            collectionModal.show();
         });
     }
     
-    if (batchActionsBtn) {
-        batchActionsBtn.addEventListener('click', toggleMultiSelectMode);
+    if (newCollectionButton) {
+        newCollectionButton.addEventListener('click', () => {
+            // Reset form
+            collectionId.value = '';
+            collectionName.value = '';
+            collectionDescription.value = '';
+            collectionModalTitle.textContent = 'New Collection';
+            // Hide delete button for new collections
+            deleteCollectionButton.classList.add('d-none');
+            // Show modal
+            collectionModal.show();
+        });
     }
     
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', selectAllDocuments);
+    // Edit document button
+    if (editDocumentButton) {
+        editDocumentButton.addEventListener('click', () => {
+            // Get current document data
+            if (!currentDocumentId) {
+                showAlert('No document selected.', 'warning');
+                return;
+            }
+            
+            fetch(`/documents/api/documents/${currentDocumentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to load document data');
+                    }
+                    
+                    // Fill form
+                    editDocumentId.value = data.id;
+                    editDocumentTitle.value = data.title || '';
+                    editDocumentAuthors.value = data.authors || '';
+                    editDocumentJournal.value = data.journal || '';
+                    editDocumentDOI.value = data.doi || '';
+                    editDocumentTags.value = data.tags ? data.tags.join(', ') : '';
+                    editDocumentCollection.value = data.collection ? data.collection.id : '';
+                    
+                    // Format publication date for date input (YYYY-MM-DD)
+                    if (data.publication_date) {
+                        const date = new Date(data.publication_date);
+                        const formattedDate = date.toISOString().split('T')[0];
+                        editDocumentPublicationDate.value = formattedDate;
+                    } else {
+                        editDocumentPublicationDate.value = '';
+                    }
+                    
+                    // Show current citation in preview
+                    if (data.citation_apa) {
+                        citationPreview.textContent = data.citation_apa;
+                    } else {
+                        citationPreview.textContent = 'Citation will be generated automatically after saving';
+                    }
+                    
+                    // Show modal
+                    editDocumentModal.show();
+                })
+                .catch(error => {
+                    console.error('Error loading document data:', error);
+                    showAlert('Error loading document data. Please try again.', 'danger');
+                });
+        });
     }
     
-    if (clearSelectionBtn) {
-        clearSelectionBtn.addEventListener('click', clearDocumentSelection);
+    // Delete document button
+    if (deleteDocumentButton) {
+        deleteDocumentButton.addEventListener('click', () => {
+            if (!currentDocumentId) {
+                showAlert('No document selected.', 'warning');
+                return;
+            }
+            
+            // Setup confirmation modal
+            deleteType = 'document';
+            deleteId = currentDocumentId;
+            deleteConfirmMessage.textContent = 'Are you sure you want to delete this document? This will permanently remove the document, all its content chunks, and the associated PDF file. This action cannot be undone.';
+            
+            // Show confirmation modal
+            deleteConfirmModal.show();
+        });
     }
     
-    if (batchMoveBtn) {
-        batchMoveBtn.addEventListener('click', function() {
-            if (batchMoveModal) {
-                batchMoveModal.show();
+    // Save document button
+    // Handle View PDF button click
+    if (viewPdfButton) {
+        viewPdfButton.addEventListener('click', () => {
+            const docId = editDocumentId.value;
+            if (docId) {
+                // Open PDF in a new tab/window
+                window.open(`/documents/api/documents/${docId}/pdf`, '_blank');
             }
         });
     }
-    
-    if (batchDeleteBtn) {
-        batchDeleteBtn.addEventListener('click', function() {
-            if (deleteConfirmModal) {
-                deleteConfirmModal.show();
-            }
-        });
-    }
-    
-    // Initialize
-    loadDocuments();
-}
 
-// Initialize document browser when the DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    initDocumentBrowser();
-});
+    if (saveDocumentButton) {
+        saveDocumentButton.addEventListener('click', () => {
+            const docId = editDocumentId.value;
+            const title = editDocumentTitle.value.trim();
+            const authors = editDocumentAuthors.value.trim();
+            const journal = editDocumentJournal.value.trim();
+            const doi = editDocumentDOI.value.trim();
+            const publicationDate = editDocumentPublicationDate.value;
+            const tags = editDocumentTags.value.trim()
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(tag => tag.length > 0);
+            const collectionId = editDocumentCollection.value;
+            
+            if (!title) {
+                showAlert('Please enter a title.', 'warning');
+                return;
+            }
+            
+            // Prepare data
+            const data = {
+                title: title,
+                authors: authors,
+                journal: journal,
+                doi: doi,
+                tags: tags
+            };
+            
+            // Add publication date if provided
+            if (publicationDate) {
+                data.publication_date = publicationDate;
+            }
+            
+            if (collectionId) {
+                data.collection_id = parseInt(collectionId);
+            }
+            
+            // Update document
+            fetch(`/documents/api/documents/${docId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to update document');
+                    }
+                    
+                    // Close modal
+                    editDocumentModal.hide();
+                    
+                    // Reload document list
+                    loadDocuments();
+                    
+                    // Reload document details
+                    showDocumentDetails(docId);
+                    
+                    // Show success toast
+                    showAlert('Document updated successfully.', 'success');
+                })
+                .catch(error => {
+                    console.error('Error updating document:', error);
+                    showAlert('Error updating document. Please try again.', 'danger');
+                });
+        });
+    }
+    
+    // Save collection button
+    if (saveCollectionButton) {
+        saveCollectionButton.addEventListener('click', () => {
+            const id = collectionId.value;
+            const name = collectionName.value.trim();
+            const description = collectionDescription.value.trim();
+            const parentId = collectionParent.value;
+            
+            if (!name) {
+                showAlert('Please enter a collection name.', 'warning');
+                return;
+            }
+            
+            // Prepare data
+            const data = {
+                name: name,
+                description: description
+            };
+            
+            // Add parent_id if selected
+            if (parentId) {
+                data.parent_id = parseInt(parentId);
+            } else {
+                data.parent_id = null;
+            }
+            
+            // Create or update collection
+            const url = id ? `/documents/api/collections/${id}` : '/documents/api/collections';
+            const method = id ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to save collection');
+                    }
+                    
+                    // Close modal
+                    collectionModal.hide();
+                    
+                    // Reload collections
+                    loadCollections();
+                    
+                    // Show success toast
+                    showAlert(`Collection ${id ? 'updated' : 'created'} successfully.`, 'success');
+                })
+                .catch(error => {
+                    console.error('Error saving collection:', error);
+                    showAlert('Error saving collection. Please try again.', 'danger');
+                });
+        });
+    }
+    
+    // Delete collection button
+    if (deleteCollectionButton) {
+        deleteCollectionButton.addEventListener('click', () => {
+            const id = collectionId.value;
+            
+            if (!id) {
+                showAlert('No collection selected.', 'warning');
+                return;
+            }
+            
+            // Setup confirmation modal
+            deleteType = 'collection';
+            deleteId = id;
+            deleteConfirmMessage.textContent = 'Are you sure you want to delete this collection? Documents in this collection will not be deleted, but they will no longer be associated with any collection. This action cannot be undone.';
+            
+            // Hide collection modal
+            collectionModal.hide();
+            
+            // Show confirmation modal
+            deleteConfirmModal.show();
+        });
+    }
+    
+    // Delete confirmation button
+    if (confirmDeleteButton) {
+        confirmDeleteButton.addEventListener('click', () => {
+            if (!deleteType || !deleteId) {
+                showAlert('Invalid delete request.', 'warning');
+                deleteConfirmModal.hide();
+                return;
+            }
+            
+            let url = '';
+            let successMessage = '';
+            
+            if (deleteType === 'document') {
+                url = `/documents/api/documents/${deleteId}`;
+                successMessage = 'Document deleted successfully.';
+            } else if (deleteType === 'collection') {
+                url = `/documents/api/collections/${deleteId}`;
+                successMessage = 'Collection deleted successfully.';
+            }
+            
+            fetch(url, {
+                method: 'DELETE'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to delete item');
+                    }
+                    
+                    // Close modal
+                    deleteConfirmModal.hide();
+                    
+                    if (deleteType === 'document') {
+                        // Reload document list
+                        loadDocuments();
+                        
+                        // Clear document details
+                        documentDetails.innerHTML = `
+                            <div class="text-center p-5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                <p class="text-muted">Document deleted</p>
+                            </div>
+                        `;
+                        
+                        // Hide action buttons
+                        if (actionButtons) {
+                            actionButtons.classList.add('d-none');
+                        }
+                        
+                        // Reset current document ID
+                        currentDocumentId = null;
+                    } else if (deleteType === 'collection') {
+                        // Reload collections
+                        loadCollections();
+                        
+                        // Reload documents if we were filtered by the deleted collection
+                        if (activeCollection === deleteId.toString()) {
+                            activeCollection = '';
+                            if (collectionFilter) {
+                                collectionFilter.value = '';
+                            }
+                            loadDocuments();
+                        }
+                    }
+                    
+                    // Show success toast
+                    showAlert(successMessage, 'success');
+                    
+                    // Reset delete state
+                    deleteType = null;
+                    deleteId = null;
+                })
+                .catch(error => {
+                    console.error('Error deleting item:', error);
+                    showAlert('Error deleting item. Please try again.', 'danger');
+                    deleteConfirmModal.hide();
+                });
+        });
+    }
+}
