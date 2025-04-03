@@ -15,6 +15,7 @@ function initDocumentBrowser() {
     const manageCollectionsButton = document.getElementById('manageCollectionsButton');
     const editDocumentButton = document.getElementById('editDocumentButton');
     const deleteDocumentButton = document.getElementById('deleteDocumentButton');
+    const refreshDocumentsBtn = document.getElementById('refreshDocumentsBtn');
     
     // Modals
     const editDocumentModal = new bootstrap.Modal(document.getElementById('editDocumentModal'));
@@ -58,6 +59,25 @@ function initDocumentBrowser() {
     let currentDocumentId = null;
     let deleteType = null; // 'document' or 'collection'
     let deleteId = null;
+    
+    // Add event listener for refresh button
+    if (refreshDocumentsBtn) {
+        refreshDocumentsBtn.addEventListener('click', function() {
+            // Add spinning animation to refresh button when clicked
+            refreshDocumentsBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>';
+            refreshDocumentsBtn.disabled = true;
+            
+            // Reload documents
+            loadDocuments();
+            loadTags();
+            
+            // Reset button after a short delay
+            setTimeout(() => {
+                refreshDocumentsBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                refreshDocumentsBtn.disabled = false;
+            }, 1000);
+        });
+    }
     
     // Initial load
     loadDocuments();

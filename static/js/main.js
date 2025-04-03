@@ -139,6 +139,11 @@ function initFileUpload() {
         // Show processing queue status
         processingQueue.classList.remove('d-none');
         
+        // Store the current batch of files to track completion
+        let currentBatchTotal = 0;
+        let previousCompleted = 0;
+        let batchStarted = false;
+        
         // Start checking queue status
         const checkQueue = () => {
             fetch('/monitoring/queue')
@@ -150,26 +155,38 @@ function initFileUpload() {
                     const completed = data.completed;
                     const failed = data.failed;
                     
-                    // Update queue info
-                    queueInfo.textContent = `${completed + failed} / ${total} processed`;
+                    // If this is the first time we're checking, record the current batch total
+                    if (!batchStarted) {
+                        currentBatchTotal = total;
+                        previousCompleted = 0;
+                        batchStarted = true;
+                    }
+                    
+                    // Calculate the number of documents processed in this batch
+                    const batchProcessed = completed + failed - previousCompleted;
+                    
+                    // Update queue info - only count the current batch
+                    queueInfo.textContent = `${batchProcessed} / ${currentBatchTotal} processed`;
                     
                     // Update progress bar
-                    const percentComplete = ((completed + failed) / total) * 100;
+                    const percentComplete = (batchProcessed / currentBatchTotal) * 100;
                     queueProgress.style.width = percentComplete + '%';
                     
-                    // Continue checking if there are still pending or processing documents
-                    if (pending > 0 || processing > 0) {
+                    // Continue checking if there are still pending or processing documents for this batch
+                    if (batchProcessed < currentBatchTotal) {
                         setTimeout(checkQueue, 5000); // Check again in 5 seconds
                     } else {
-                        // All documents processed
+                        // All documents in this batch processed
                         setTimeout(() => {
                             processingQueue.classList.add('d-none');
+                            batchStarted = false; // Reset for next batch
                         }, 3000); // Hide after 3 seconds
                     }
                 })
                 .catch(error => {
                     console.error('Error checking queue status:', error);
                     processingQueue.classList.add('d-none');
+                    batchStarted = false; // Reset for next batch
                 });
         };
         
