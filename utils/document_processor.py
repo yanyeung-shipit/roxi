@@ -512,14 +512,12 @@ def generate_tags_from_content(text, document=None, metadata=None):
         # Skip common words that aren't helpful as tags
         common_words = {'the', 'a', 'an', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'to', 'and', 'or', 'from'}
         
-        # Look for significant noun phrases in title (diseases, treatments, etc.)
+        # Look for significant noun phrases in title (diseases, study types, etc.)
         important_patterns = [
             # Disease patterns
-            r"(rheumatoid arthritis|systemic lupus|psoriatic arthritis|ankylosing spondylitis|osteoarthritis|gout|systemic sclerosis|vasculitis|sjogren's syndrome|polymyalgia rheumatica|polymyositis|fibromyalgia|interstitial lung disease)",
-            # Treatment patterns
-            r"(dmards?|biologics?|jak inhibitors?|corticosteroids?|nsaids?|methotrexate|hydroxychloroquine|rituximab)",
+            r"(rheumatoid arthritis|systemic lupus|psoriatic arthritis|ankylosing spondylitis|osteoarthritis|gout|systemic sclerosis|vasculitis|sjogren's syndrome|polymyalgia rheumatica|polymyositis|fibromyalgia|interstitial lung disease|myositis|axial spondyloarthritis|reactive arthritis|enteropathic arthritis|giant cell arteritis|takayasu|polyarteritis nodosa|granulomatosis with polyangiitis|microscopic polyangiitis|eosinophilic granulomatosis|behcet's)",
             # Study type patterns
-            r"(guidelines?|recommendations?|consensus|meta-analysis|systematic review|cohort study|case report|case series|clinical trial)"
+            r"(guidelines?|recommendations?|consensus|meta-analysis|systematic review|cohort study|case report|case series|clinical trial|cross-sectional study|case-control study|epidemiology|incidence|prevalence|registries|real-world evidence)"
         ]
         
         for pattern in important_patterns:
@@ -545,50 +543,104 @@ def generate_tags_from_content(text, document=None, metadata=None):
     # Define dictionaries needed for tag generation and classification
     # Common rheumatology disease categories
     diseases = {
-        "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-", "seropositive arthritis"],
-        "Systemic Lupus Erythematosus": ["systemic lupus", "sle ", "sle,", "sle.", "sle)", "lupus nephritis", "lupus erythematosus"],
-        "Psoriatic Arthritis": ["psoriatic arthritis", "psa ", "psa,", "psa.", "psa)"],
-        # Remove "as" abbreviation since it's a common preposition
-        "Ankylosing Spondylitis": ["ankylosing spondylitis", "axial spondyloarthritis"],
-        "Osteoarthritis": ["osteoarthritis", "oa ", "oa,", "oa.", "oa)", "degenerative joint disease"],
-        "Gout": ["gout", "gouty arthritis", "crystal arthropathy", "uric acid"],
-        "Systemic Sclerosis": ["systemic sclerosis", "scleroderma", "sclerosis"],
-        "Vasculitis": ["vasculitis", "anca", "giant cell arteritis", "takayasu", "polyarteritis"],
-        "Sjögren's Syndrome": ["sjögren", "sjogren", "sicca syndrome"],
+        "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-"],
+
         "Polymyalgia Rheumatica": ["polymyalgia rheumatica", "pmr ", "pmr,", "pmr.", "pmr)"],
-        "Polymyositis": ["polymyositis", "dermatomyositis", "inflammatory myopathy", "myositis"],
+        
+        "Systemic Lupus Erythematosus": ["systemic lupus", "sle ", "sle,", "sle.", "sle)", "lupus nephritis", "lupus erythematosus"],
+        
+        "Cutaneous lupus": ["discoid lupus", "lupus profundus", "lupus panniculitis", "tumid lupus", "Urticarial lupus"],
+
+        "Systemic Sclerosis": ["systemic sclerosis", "scleroderma", "SSC", "CREST syndrome"],
+
+        "Myositis": ["IIM", "Idiopathic inflammatory myopathy", "dermatomyositis", "polymyositis"],
+        
+        "Sjögren's": ["sjögren", "sjogren", "sicca syndrome", "Sjögren's Syndrome", "Sjogren's Disease", "Sjögren's Disease"],
+        
+        "Spondyloarthropathy": ["axial spondyloarthritis", "psoriatic arthritis", "reactive arthritis", "enteropathic arthritis"],
+
+        "axial spondyloarthritis": ["ankylosing spondylitis", "Ankylosing Spondylitis", "non-radiographic axial spondyloarthritis", "AxSpA", "nr-AxSpA"],
+        
+        "Psoriatic Arthritis": ["psoriatic arthritis", "psa ", "psa,", "psa.", "psa)"],
+
+        "Reactive Arthritis": ["ReA", "post-infectious arthritis", "gonococcal arthritis", "Reiter's Syndrome", "Reiter"],
+
+        "Enteropathic arthritis": ["IBD-arthritis", "IBD", "inflammatory bowel disease", "Crohn's", "Ulcerative colitis"],
+
+        "Vasculitis": ["vasculitis", "anca", "giant cell arteritis", "takayasu", "polyarteritis"],
+        
+        "GCA": ["Giant Cell Arteritis", "temporal arteritis"],
+
+        "Takayasu": ["TAK", "Takayasu"],
+
+        "Polyarteritis Nodosa": ["PAN", "arteritis"],
+
+        "GPA": ["Granulomatosis with Polyangiitis", "Wegener's", "ANCA", "AAV"],
+
+        "MPA": ["Microscopic Polyangiitis", "ANCA", "AAV"],
+
+        "EGPA": ["Eosinophilic granulomatosis and polyangiitis", "Churg-Strauss"],
+
+        "immune-complex vasculitis": ["Immune-Complex Mediated Vasculitis"],
+
+        "IgA vasculitis": ["IgA vasculitis"],
+
+        "Urticarial vasculitis": ["Urticarial vasculitis"],
+
+        "anti-GBM": ["ANTI-GLOMERULAR BASEMENT MEMBRANE DISEASE", "Anti-GBM disease", "Goodpasture Disease"],
+
+        "Osteoarthritis": ["osteoarthritis", "oa ", "oa,", "oa.", "oa)", "degenerative joint disease"],
+
+        "Cryo": ["Cryoglobulinemic Vasculitis", "Mixed Cryoglobulinemia Syndrome", "cryoglobulinemia"],
+
+        "Behcet's": ["Behçet's"],
+        
+        "Gout": ["gout", "gouty arthritis"],
+
+        "CPPD": ["Calcium pyrophosphate deposition disease", "pseudogout", "crowned dens"],
+
+        "PCNSV": ["Primary CNS vasculitis", "Primary angiitis of the CNS", "PACNS"],
+
+        "Still's Disease": ["Adult-onset Still's Disease", "Stills Disease", "systemic JIA", "AOSD"],
+
+        "Sarcoidosis": ["sarcoid"],
+
+        "IgG4-RD": ["IgG4-related disease", "MIKULICZ", "Riedel's thyroiditis"],
+
+        "Relapsing polychondritis": ["RPC", "polychondritis", "VEXAS"],
+              
         "Fibromyalgia": ["fibromyalgia", "fibromyalgia syndrome", "fms ", "fms,", "fms.", "fms)"],
-        "ILD": ["interstitial lung disease", "ild ", "ild,", "ild.", "ild)", "pulmonary fibrosis"]
-    }
-    
-    # Treatment categories
-    treatments = {
-        "DMARDs": ["disease-modifying", "dmard", "conventional synthetic", "csdmard"],
-        "Biologics": ["biologic", "tnf inhibitor", "tnf-alpha", "bDMARD"],
-        "JAK Inhibitors": ["jak inhibitor", "janus kinase", "tofacitinib", "baricitinib", "upadacitinib"],
-        "Corticosteroids": ["corticosteroid", "glucocorticoid", "prednisone", "methylprednisolone"],
-        "NSAIDs": ["nsaid", "non-steroidal", "non steroidal", "anti-inflammatory", "ibuprofen", "naproxen"],
-        "Methotrexate": ["methotrexate", "mtx ", "mtx,", "mtx.", "mtx)"],
-        "Hydroxychloroquine": ["hydroxychloroquine", "hcq ", "hcq,", "hcq.", "hcq)", "plaquenil"],
-        "Rituximab": ["rituximab", "anti-cd20"],
-        "Immunosuppressants": ["immunosuppressant", "immunosuppressive", "cyclophosphamide", "azathioprine", "mycophenolate"]
+        
+        "ILD": ["interstitial lung disease", "ild ", "ild,", "ild.", "ild)", "pulmonary fibrosis", "IPF", "NSIP", "UIP", "fibrotic lung disease"]
     }
     
     # Document types
     document_types = {
-        "Guidelines": ["guideline", "recommendation", "consensus", "eular", "acr criteria"],
-        "Clinical Trial": ["clinical trial", "phase iii", "phase 3", "randomized", "randomised", "rct ", "rct,", "rct."],
+        "Guidelines": ["guideline", "recommendation", "consensus", "eular", "acr criteria", "practice guidelines"],
+        "Clinical Trial": ["clinical trial", "phase iii", "phase 3", "randomized", "randomised", "rct ", "rct,", "rct.", "randomized controlled trial"],
         "Meta-Analysis": ["meta-analysis", "meta analysis", "systematic review"],
-        "Cohort Study": ["cohort study", "longitudinal study", "observational study"],
+        "Cohort Study": ["cohort study", "longitudinal study", "observational study", "prospective studies", "retrospective studies"],
         "Case Report": ["case report", "case series"],
-        "Review": ["review", "literature review"]
+        "Review": ["review", "literature review"],
+        "Cross-Sectional Study": ["cross-sectional study"],
+        "Case-Control Study": ["case-control study"],
+        "Registries": ["registries"],
+        "Real-World Evidence": ["real-world evidence"],
+        "Epidemiology": ["epidemiology"],
+        "Incidence": ["incidence"],
+        "Prevalence": ["prevalence"],
+        "Disease Burden": ["disease burden"],
+        "Risk Factors": ["risk factors"],
+        "Comorbidity": ["comorbidity"],
+        "Population Surveillance": ["population surveillance"],
+        "Health Services Research": ["health services research"],
+        "Outcomes Research": ["outcomes research"]
     }
     
     # Store category names for later use
     all_disease_keys = list(diseases.keys())
-    all_treatment_keys = list(treatments.keys())
     all_document_type_keys = list(document_types.keys())
-    all_domain_keys = all_disease_keys + all_treatment_keys + all_document_type_keys
+    all_domain_keys = all_disease_keys + all_document_type_keys
     
     # STRATEGY 4: Content-based extraction using domain knowledge
     # If we still don't have enough tags, fall back to the specialized approach
@@ -612,17 +664,7 @@ def generate_tags_from_content(text, document=None, metadata=None):
                     # Add to the score for this disease
                     tag_scores[disease] += count
         
-        # Check for treatment terms with frequency analysis
-        for treatment, terms in treatments.items():
-            # Initialize score for this treatment
-            tag_scores[treatment] = 0
-            
-            for term in terms:
-                # Count occurrences of the term
-                count = text_lower.count(term)
-                if count > 0:
-                    # Add to the score for this treatment
-                    tag_scores[treatment] += count
+        # Treatment categories have been removed as requested
         
         # Check for document type terms with frequency analysis
         for doc_type, terms in document_types.items():

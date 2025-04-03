@@ -1,0 +1,72 @@
+diseases = {
+    "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-"],
+
+    "Polymyalgia Rheumatica": ["polymyalgia rheumatica", "pmr ", "pmr,", "pmr.", "pmr)"],
+    
+    "Systemic Lupus Erythematosus": ["systemic lupus", "sle ", "sle,", "sle.", "sle)", "lupus nephritis", "lupus erythematosus"],
+    
+    "Cutaneous lupus": ["discoid lupus", "lupus profundus", "lupus panniculitis", "tumid lupus", "Urticarial lupus"],
+
+    "Systemic Sclerosis": ["systemic sclerosis", "scleroderma", "SSC", "CREST syndrome"],
+
+    "Myositis": ["IIM", "Idiopathic inflammatory myopathy", "dermatomyositis", "polymyositis"],
+    
+    "Sjögren's": ["sjögren", "sjogren", "sicca syndrome", "Sjögren's Syndrome" "Sjogren's Disease" "Sjögren's Disease"],
+    
+    "Spondyloarthropathy": ["axial spondyloarthritis", "psoriatic arthritis", "reactive arthritis", "enteropathic arthritis"],
+
+    # Remove "as" abbreviation since it's a common preposition
+    "axial spondyloarthritis": ["ankylosing spondylitis", "Ankylosing Spondylitis", "non-radiographic axial spondyloarthritis", "AxSpA", "nr-AxSpA"],
+    
+    "Psoriatic Arthritis": ["psoriatic arthritis", "psa ", "psa,", "psa.", "psa)"],
+
+    "Reactive Arthritis": ["ReA", "post-infectious arthritis", "gonococcal arthritis", "Reiter’s Syndrome", "Reiter"],
+
+    "Enteropathic arthritis": ["IBD-arthritis", "IBD", "inflammatory bowel disease", "Crohn's", "Ulcerative colitis"],
+
+    "Vasculitis": ["vasculitis", "anca", "giant cell arteritis", "takayasu", "polyarteritis"],
+    
+    "GCA": ["Giant Cell Arteritis", "temporal arteritis"],
+
+    "Takayasu": [TAK, "Takayasu"],
+
+    "Polyarteritis Nodosa": ["PAN", "arteritis"],
+
+    "GPA": ["Granulomatosis with Polyangiitis", "Wegener's", "ANCA", "AAV"],
+
+    "MPA": ["Microscopic Polyangiitis", "ANCA", "AAV"],
+
+    "EGPA": ["Eosinophilic granulomatosis and polyangiitis", "Churg-Strauss"],
+
+    "immune-complex vasculitis": ["Immune-Complex Mediated Vasculitis"],
+
+    "IgA vasculitis",
+
+    "Urticarial vasculitis",
+
+    "anti-GBM": ["ANTI-GLOMERULAR BASEMENT MEMBRANE DISEASE", "Anti-GBM disease", "Goodpasture Disease"],
+
+    "Osteoarthritis": ["osteoarthritis", "oa ", "oa,", "oa.", "oa)", "degenerative joint disease"],
+
+    "Cryo": ["Cryoglobulinemic Vasculitis", "Mixed Cryoglobulinemia Syndrome", "cryoglobulinemia"]
+
+    "Behcet's": ["Behçet's"]
+    
+    "Gout": ["gout", "gouty arthritis"],
+
+    "CPPD": ["Calcium pyrophosphate deposition disease", "pseudogout", "crowned dens"],
+
+    "PCNSV": ["Primary CNS vasculitis", "Primary angiitis of the CNS", "PACNS"],
+
+    "Still's Disease": ["Adult-onset Still’s Disease", "Stills Disease", "systemic JIA" "AOSD"],
+
+    "Sarcoidosis": ["sarcoid"]
+
+    "IgG4-RD": ["IgG4-related disease", 'MIKULICZ", "Riedel’s thyroiditis”],
+
+    "Relapsing polychondritis": ["RPC", "polychondritis", "VEXAS"]
+          
+    "Fibromyalgia": ["fibromyalgia", "fibromyalgia syndrome", "fms ", "fms,", "fms.", "fms)"],
+    
+    "ILD": ["interstitial lung disease", "ild ", "ild,", "ild.", "ild)", "pulmonary fibrosis", "IPF", "NSIP", "UIP", "fibrotic lung disease"]
+}
