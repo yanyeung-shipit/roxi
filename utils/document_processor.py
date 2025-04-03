@@ -543,7 +543,7 @@ def generate_tags_from_content(text, document=None, metadata=None):
     # Define dictionaries needed for tag generation and classification
     # Common rheumatology disease categories
     diseases = {
-        "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-"],
+        "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-", "rheumatoid", "arthritis, rheumatoid"],
 
         "Polymyalgia Rheumatica": ["polymyalgia rheumatica", "pmr ", "pmr,", "pmr.", "pmr)"],
         
@@ -616,12 +616,12 @@ def generate_tags_from_content(text, document=None, metadata=None):
     
     # Document types
     document_types = {
-        "Guidelines": ["guideline", "recommendation", "consensus", "eular", "acr criteria", "practice guidelines"],
+        "Guideline": ["guideline", "guidelines", "recommendation", "consensus", "eular", "acr criteria", "practice guidelines"],
         "Clinical Trial": ["clinical trial", "phase iii", "phase 3", "randomized", "randomised", "rct ", "rct,", "rct.", "randomized controlled trial"],
         "Meta-Analysis": ["meta-analysis", "meta analysis", "systematic review"],
         "Cohort Study": ["cohort study", "longitudinal study", "observational study", "prospective studies", "retrospective studies"],
         "Case Report": ["case report", "case series"],
-        "Review": ["review", "literature review"],
+        "Review": ["review", "literature review", "primer"],
         "Cross-Sectional Study": ["cross-sectional study"],
         "Case-Control Study": ["case-control study"],
         "Registries": ["registries"],
@@ -657,9 +657,12 @@ def generate_tags_from_content(text, document=None, metadata=None):
             # Initialize score for this disease
             tag_scores[disease] = 0
             
+            # Make disease name lowercase for case-insensitive matching
+            disease_lower = disease.lower()
+            
             for term in terms:
                 # Count occurrences of the term
-                count = text_lower.count(term)
+                count = text_lower.count(term.lower())
                 if count > 0:
                     # Add to the score for this disease
                     tag_scores[disease] += count
@@ -671,9 +674,12 @@ def generate_tags_from_content(text, document=None, metadata=None):
             # Initialize score for this document type
             tag_scores[doc_type] = 0
             
+            # Make document type lowercase for case-insensitive matching
+            doc_type_lower = doc_type.lower()
+            
             for term in terms:
-                # Count occurrences of the term
-                count = text_lower.count(term)
+                # Count occurrences of the term (case-insensitive)
+                count = text_lower.count(term.lower())
                 if count > 0:
                     # Add to the score for this document type
                     tag_scores[doc_type] += count

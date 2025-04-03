@@ -362,26 +362,33 @@ def get_mesh_terms_for_rheumatology(pmid: str) -> List[str]:
         
         # List of rheumatology-relevant MeSH terms to check
         rheum_relevant_terms = [
-            'Rheumatic Diseases', 'Arthritis', 'Rheumatoid', 'Arthritis, Rheumatoid',
+            'Rheumatic Diseases', 'Rheumatoid Arthritis', 'Arthritis, Rheumatoid',
             'Lupus Erythematosus, Systemic', 'Spondylarthritis', 'Spondylarthropathies',
             'Spondylitis, Ankylosing', 'Psoriatic Arthritis', 'Arthritis, Psoriatic',
             'Sjögren\'s Syndrome', 'Scleroderma, Systemic', 'Polymyositis',
             'Dermatomyositis', 'Vasculitis', 'Gout', 'Osteoarthritis',
             'Polymyalgia Rheumatica', 'Fibromyalgia', 'Raynaud Disease',
             'Behçet Syndrome', 'Giant Cell Arteritis', 'Antiphospholipid Syndrome',
-            'Mixed Connective Tissue Disease', 'Autoimmune Diseases'
+            'Mixed Connective Tissue Disease', 'Autoimmune Diseases', 'Interstitial Lung Disease',
+            'ILD', 'Lung Diseases, Interstitial'
         ]
         
         # Extract relevant terms
         for mesh_item in mesh_terms:
             term = mesh_item['term']
-            # Direct match with rheumatology terms
-            if term in rheum_relevant_terms:
-                rheumatology_terms.append(term)
-            # Check for rheumatology-related qualifiers
-            elif any(qual in ['immunology', 'pathology', 'diagnosis', 'therapy'] 
-                   for qual in mesh_item['qualifiers']):
-                rheumatology_terms.append(term)
+            term_lower = term.lower()
+            
+            # Direct match with rheumatology terms (case-insensitive)
+            for rheum_term in rheum_relevant_terms:
+                if term_lower == rheum_term.lower():
+                    # Use the standardized format from our list
+                    rheumatology_terms.append(rheum_term)
+                    break
+            else:  # This else belongs to the for loop - it runs if no break occurs
+                # Check for rheumatology-related qualifiers
+                if any(qual in ['immunology', 'pathology', 'diagnosis', 'therapy'] 
+                     for qual in mesh_item['qualifiers']):
+                    rheumatology_terms.append(term)
                 
         return list(set(rheumatology_terms))  # Remove duplicates
                 
@@ -419,16 +426,19 @@ def generate_tags_from_pubmed(pmid: str) -> List[str]:
         'Giant Cell Arteritis', 'GCA', 'Fibromyalgia', 'FMS', 'Raynaud',
         'Behçet', 'Antiphospholipid', 'APS', 'Mixed Connective Tissue Disease', 'MCTD',
         'Juvenile Arthritis', 'JIA', 'Dermatomyositis', 'Polymyositis', 'Anti-CCP',
-        'RF', 'Rheumatoid Factor', 'TNF', 'Biologics', 'DMARDs'
+        'RF', 'Rheumatoid Factor', 'TNF', 'Biologics', 'DMARDs', 'ILD', 
+        'Interstitial Lung Disease', 'Guidelines', 'Guideline', 'EULAR', 'ACR'
     ]
     
     # Check title and abstract for keywords
     title = paper_details.get('title', '')
     abstract = paper_details.get('abstract', '')
-    full_text = f"{title} {abstract}"
+    full_text = f"{title} {abstract}".lower()
     
     for keyword in rheum_keywords:
-        if keyword in full_text:
+        if keyword.lower() in full_text:
+            # Use the original keyword formatting in our tags
+            # This ensures consistent tag presentation
             keywords.append(keyword)
     
     # Combine all tags and remove duplicates
