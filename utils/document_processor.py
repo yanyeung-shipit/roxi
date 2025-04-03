@@ -126,12 +126,26 @@ def process_document(document_id):
         # Look for DOI in first 1000 characters (usually contains citation info)
         text_sample = text[:1000]
         
-        # Try to extract DOI directly from text first
-        from utils.doi_validator import DOI_WITH_PREFIX_REGEX
-        doi_match = re.search(DOI_WITH_PREFIX_REGEX, text_sample, re.IGNORECASE)
-        if doi_match:
-            doi = doi_match.group(1)
-            document.doi = doi
+        # Check if this is potentially a EULAR guideline document based on title or content
+        is_eular_guideline = False
+        if "EULAR" in text[:5000] or "European League Against Rheumatism" in text[:5000]:
+            is_eular_guideline = True
+            logger.info(f"Detected possible EULAR guideline document: {document_id}")
+            
+            # EULAR guidelines often have ARD journal DOIs with specific pattern
+            eular_doi_match = re.search(r'(10\.\d{4}/ard-\d{4}-\d+)', text[:5000])
+            if eular_doi_match:
+                doi = eular_doi_match.group(1)
+                document.doi = doi
+                logger.info(f"Extracted EULAR guideline DOI: {doi}")
+        
+        # Try standard DOI extraction if not already found
+        if not doi:
+            from utils.doi_validator import DOI_WITH_PREFIX_REGEX
+            doi_match = re.search(DOI_WITH_PREFIX_REGEX, text_sample, re.IGNORECASE)
+            if doi_match:
+                doi = doi_match.group(1)
+                document.doi = doi
         
         # If we have a DOI, try to validate with Crossref and get more metadata
         metadata = None
@@ -149,10 +163,33 @@ def process_document(document_id):
             if document.title and "_" in document.title and not " " in document.title:
                 # Looks like a filename, try to find a better title
                 title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text_sample)
-                if not title_match:
-                    # Try alternative patterns
-                    title_match = re.search(r'EULAR recommendations for (.+?)(?:\n|\.)', text_sample)
-                if title_match:
+                
+                # Special handling for EULAR documents (common in rheumatology)
+                eular_patterns = [
+                    # Standard EULAR recommendation pattern
+                    r'EULAR recommendations for (?:the management of |the treatment of |)(.+?)(?:\n|\.|:)',
+                    # Alternative patterns seen in EULAR papers
+                    r'(?:20\d{2}|updated) EULAR recommendations for (.+?)(?:\n|\.|:)',
+                    r'EULAR/ACR recommendations for (.+?)(?:\n|\.|:)',
+                    r'EULAR points to consider (?:for|in) (.+?)(?:\n|\.|:)',
+                    r'The (?:20\d{2}|updated) EULAR (?:recommendations|points to consider) (?:for|in) (.+?)(?:\n|\.|:)'
+                ]
+                
+                for pattern in eular_patterns:
+                    eular_match = re.search(pattern, text[:5000], re.IGNORECASE)
+                    if eular_match:
+                        title = f"EULAR recommendations for {eular_match.group(1).strip()}"
+                        document.title = title
+                        # If it's an EULAR guideline, set journal to ARD if not already set
+                        if not document.journal:
+                            document.journal = "Annals of the Rheumatic Diseases"
+                        break
+                        
+                # Fall back to standard title extraction if no EULAR pattern matched
+                if not title_match and document.title and "_" in document.title:
+                    title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text_sample)
+                    
+                if title_match and document.title and "_" in document.title:
                     document.title = title_match.group(1).strip()
             
             # Try to extract authors

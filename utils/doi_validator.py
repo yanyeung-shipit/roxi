@@ -6,12 +6,13 @@ logger = logging.getLogger(__name__)
 
 # Regular expression for DOI pattern
 # Format: 10.NNNN/any_characters_here
-# Note: We're careful about capturing parentheses in the DOI
+# Note: We're careful about capturing parentheses in the DOI and ensuring proper word boundaries
 # Opening parentheses are allowed in the middle, but not capturing closing parentheses at the end
-DOI_REGEX = r'(10\.\d{4,9}/[-._;\(\)/:A-Z0-9]+?)(?:\)|$|[^\w\-\.;/\(\)])'
-DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9]+?)(?:\)|$|[^\w\-\.;/\(\)])'
+# We also make sure not to capture words that may follow the DOI like "Recommendation", "Article", etc.
+DOI_REGEX = r'(10\.\d{4,9}/[-._;\(\)/:A-Z0-9-]+?)(?:\s+[A-Z][a-z]+|\s|\)|$|[^\w\-\.;/\(\)])'
+DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:\s+[A-Z][a-z]+|\s|\)|$|[^\w\-\.;/\(\)])'
 # Format with 'doi:' prefix
-DOI_WITH_PREFIX_REGEX = r'doi:?\s*(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9]+?)(?:\)|$|[^\w\-\.;/\(\)])'
+DOI_WITH_PREFIX_REGEX = r'doi:?\s*(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:\s+[A-Z][a-z]+|\s|\)|$|[^\w\-\.;/\(\)])'
 
 def extract_doi_from_text(text):
     """
@@ -154,7 +155,11 @@ def extract_and_validate_doi(text):
         # Without prefix, just looking for the DOI pattern
         r'(?<!\w)(10\.\d{4,9}/[^\s\)\]\"\']+)',
         # DOI in URL format
-        r'https?://doi\.org/(10\.\d{4,9}/[^\s\)\]\"\']+)'
+        r'https?://doi\.org/(10\.\d{4,9}/[^\s\)\]\"\']+)',
+        # Specific pattern for Annals of Rheumatic Diseases (ARD) journal
+        r'(10\.\d{4}/ard-\d{4}-\d+)[^\d]',
+        # Another common ARD pattern 
+        r'(10\.\d{4}/annrheumdis-\d{4}-\d+)[^\d]'
     ]
     
     for pattern in patterns:
@@ -176,6 +181,19 @@ def extract_and_validate_doi(text):
     if match:
         # Extract just the DOI part without trailing punctuation
         candidate_doi = re.sub(r'[,;\.\)\]\"\']+$', '', match.group(1))
+        # Further clean the DOI - specifically look for common patterns in rheumatology papers
+        # Remove words like "Recommendation", "Article", etc. that might be appended to the DOI
+        if "Recommendation" in candidate_doi:
+            candidate_doi = candidate_doi.split("Recommendation")[0]
+        elif "Article" in candidate_doi:
+            candidate_doi = candidate_doi.split("Article")[0]
+        
+        # Specific handling for EULAR guidelines DOIs which often have this pattern
+        ard_pattern = r'(10\.\d{4}/ard-\d{4}-\d+)'
+        ard_match = re.search(ard_pattern, candidate_doi)
+        if ard_match:
+            candidate_doi = ard_match.group(1)
+            
         if check_doi_exists(candidate_doi):
             metadata = validate_doi_with_crossref(candidate_doi)
             if metadata:
