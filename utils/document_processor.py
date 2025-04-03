@@ -12,6 +12,13 @@ from utils.pdf_processor import extract_text_from_pdf, chunk_text
 from utils.embeddings import generate_embeddings
 from utils.doi_validator import extract_and_validate_doi, validate_doi_with_crossref
 from utils.citation_generator import generate_apa_citation
+# Import PubMed integration
+from utils.pubmed_integration import (
+    get_paper_details_by_doi,
+    get_article_citation,
+    doi_to_pmid,
+    generate_tags_from_pubmed
+)
 
 logger = logging.getLogger(__name__)
 
@@ -148,12 +155,21 @@ def process_document(document_id):
                 doi = doi_match.group(1)
                 document.doi = doi
         
-        # If we have a DOI, try to validate with Crossref and get more metadata
+        # If we have a DOI, try to validate with Crossref and PubMed
         metadata = None
+        pubmed_data = None
+        
         if doi:
-            metadata = validate_doi_with_crossref(doi)
+            # First try PubMed (more medical/rheumatology focused)
+            logger.info(f"Trying to fetch metadata from PubMed for DOI: {doi}")
+            pubmed_data = get_paper_details_by_doi(doi)
+            
+            # Fallback to Crossref if PubMed doesn't have it
+            if not pubmed_data:
+                logger.info(f"PubMed data not found, falling back to Crossref for DOI: {doi}")
+                metadata = validate_doi_with_crossref(doi)
         else:
-            # Otherwise try the standard extraction method
+            # No DOI yet, try the standard extraction method
             metadata = extract_and_validate_doi(text)
         
         # If we can't get metadata from CrossRef, try direct extraction from text
@@ -262,11 +278,63 @@ def process_document(document_id):
             if published_date:
                 document.publication_date = published_date
         
-        # Generate APA citation
-        document.citation_apa = generate_apa_citation(document)
-        
-        # Generate tags based on content, document metadata, and Crossref data
-        document.tags = generate_tags_from_content(text, document=document, metadata=metadata)
+        # Use PubMed data if available
+        if pubmed_data:
+            logger.info(f"Updating document with PubMed data for document {document_id}")
+            
+            # Update with PubMed metadata
+            document.title = pubmed_data.get('title') or document.title
+            
+            if pubmed_data.get('authors'):
+                document.authors = ", ".join(pubmed_data['authors'])
+                
+            if pubmed_data.get('journal'):
+                document.journal = pubmed_data['journal']
+                
+            if pubmed_data.get('publication_date'):
+                try:
+                    if 'T' in pubmed_data['publication_date']:
+                        pub_date = datetime.datetime.fromisoformat(pubmed_data['publication_date'])
+                    else:
+                        pub_date = datetime.datetime.strptime(pubmed_data['publication_date'], '%Y-%m-%d')
+                    document.publication_date = pub_date
+                except (ValueError, TypeError):
+                    logger.warning(f"Failed to parse PubMed date format: {pubmed_data['publication_date']}")
+            
+            # Generate APA citation from PubMed data
+            pubmed_citation = get_article_citation(pubmed_data)
+            if pubmed_citation:
+                document.citation_apa = pubmed_citation
+                logger.info(f"Using PubMed citation for document {document_id}")
+            else:
+                # Fallback to our own citation generator
+                document.citation_apa = generate_apa_citation(document)
+                
+            # Get PMID to fetch MeSH terms
+            pmid = None
+            if document.doi:  # Check that DOI is not None
+                pmid = doi_to_pmid(document.doi)
+            if pmid:
+                logger.info(f"Found PMID: {pmid} for document {document_id}")
+                pubmed_tags = generate_tags_from_pubmed(pmid)
+                
+                if pubmed_tags:
+                    document.tags = pubmed_tags
+                    logger.info(f"Using PubMed tags for document {document_id}: {', '.join(pubmed_tags)}")
+                else:
+                    # Fallback to our own tag generator
+                    document.tags = generate_tags_from_content(text, document=document, metadata=metadata)
+            else:
+                # Fallback to our own tag generator
+                document.tags = generate_tags_from_content(text, document=document, metadata=metadata)
+                
+        else:
+            # No PubMed data, use our standard approach
+            # Generate APA citation
+            document.citation_apa = generate_apa_citation(document)
+            
+            # Generate tags based on content, document metadata, and Crossref data
+            document.tags = generate_tags_from_content(text, document=document, metadata=metadata)
         
         # Split text into chunks
         from utils.pdf_processor import chunk_text
