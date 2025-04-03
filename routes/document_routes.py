@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, send_from_directory, abort
 import sqlalchemy as sa
 import os
 import shutil
@@ -769,4 +769,38 @@ def update_document_collection(document_id):
         return jsonify({
             'success': False,
             'error': f"Failed to update document collection: {str(e)}"
+        }), 500
+
+@document_routes.route('/api/documents/<int:document_id>/pdf', methods=['GET'])
+def view_document_pdf(document_id):
+    """
+    Serve the PDF file of a document for viewing
+    """
+    try:
+        document = Document.query.get(document_id)
+        
+        if not document:
+            return jsonify({
+                'success': False,
+                'error': f'Document with ID {document_id} not found'
+            }), 404
+        
+        # Check if file exists
+        upload_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+        
+        # Ensure the file exists
+        if not document.filename or not os.path.exists(os.path.join(upload_folder, document.filename)):
+            return jsonify({
+                'success': False,
+                'error': 'PDF file not found'
+            }), 404
+        
+        # Send the file
+        return send_from_directory(upload_folder, document.filename, as_attachment=False)
+    except Exception as e:
+        import logging
+        logging.exception(f"Error viewing PDF: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to retrieve PDF: {str(e)}"
         }), 500

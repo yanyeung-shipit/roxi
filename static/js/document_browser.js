@@ -46,6 +46,7 @@ function initDocumentBrowser() {
     
     const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
     const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+    const viewPdfButton = document.getElementById('viewPdfButton');
     
     // State
     let currentPage = 1;
@@ -1051,6 +1052,17 @@ function initDocumentBrowser() {
     }
     
     // Save document button
+    // Handle View PDF button click
+    if (viewPdfButton) {
+        viewPdfButton.addEventListener('click', () => {
+            const docId = editDocumentId.value;
+            if (docId) {
+                // Open PDF in a new tab/window
+                window.open(`/documents/api/documents/${docId}/pdf`, '_blank');
+            }
+        });
+    }
+
     if (saveDocumentButton) {
         saveDocumentButton.addEventListener('click', () => {
             const docId = editDocumentId.value;
