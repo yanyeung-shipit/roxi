@@ -22,7 +22,13 @@
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
-    margin-bottom: 0.75rem;
+    margin-bottom: 15px !important;
+    height: auto;
+    min-height: 100px;
+}
+
+.document-card .card-body {
+    padding: 15px;
 }
 
 .document-card:hover {

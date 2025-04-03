@@ -469,7 +469,7 @@ function initDocumentBrowser() {
             const multiSelectClass = isSelected ? 'selected-document' : '';
             
             const card = document.createElement('div');
-            card.className = `card document-card mb-3 ${multiSelectClass}`;
+            card.className = `card document-card ${multiSelectClass}`;
             card.dataset.id = doc.id;
             
             // Add checkbox for multi-select mode
@@ -486,8 +486,8 @@ function initDocumentBrowser() {
                         <div class="d-flex align-items-start">
                             ${checkboxHtml}
                             <div>
-                                <h5 class="card-title">${escapeHtml(doc.title)}</h5>
-                                <h6 class="card-subtitle mb-2 text-muted">${escapeHtml(doc.authors || 'Unknown Authors')}</h6>
+                                <h5 class="card-title text-truncate" style="max-width: 400px;">${escapeHtml(doc.title)}</h5>
+                                <h6 class="card-subtitle mb-2 text-muted text-truncate" style="max-width: 400px;">${escapeHtml(doc.authors || 'Unknown Authors')}</h6>
                                 <p class="card-text small text-muted">
                                     ${doc.journal ? `${escapeHtml(doc.journal)} - ` : ''}
                                     ${formatDate(doc.publication_date || doc.upload_date)}
