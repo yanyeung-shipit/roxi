@@ -1634,14 +1634,11 @@ function initDocumentBrowser() {
         });
     }
 }
-    /**
-     * Check document text quality and update OCR section
-     */
-    }
-    /**
-     * Check document text quality and update OCR section
-     */
-    function checkDocumentTextQuality(documentId) {
+
+/**
+ * Check document text quality and update OCR section
+ */
+function checkDocumentTextQuality(documentId) {
         // Get OCR UI elements for document panel
         const documentOcrSection = document.getElementById('documentOcrSection');
         const documentOcrStatusBadge = document.getElementById('documentOcrStatusBadge');
@@ -1880,3 +1877,6 @@ function initDocumentBrowser() {
                 });
         }, 3000); // Check every 3 seconds
     }
+
+// Initialize document browser when DOM is loaded
+document.addEventListener('DOMContentLoaded', initDocumentBrowser);
