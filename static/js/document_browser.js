@@ -57,6 +57,15 @@ function initDocumentBrowser() {
     const confirmDeleteButton = document.getElementById('confirmDeleteButton');
     const viewPdfButton = document.getElementById('viewPdfButton');
     
+    // OCR elements
+    const ocrSection = document.getElementById('ocrSection');
+    const textQualityBadge = document.getElementById('textQualityBadge');
+    const ocrStatusBadge = document.getElementById('ocrStatusBadge');
+    const applyOcrButton = document.getElementById('applyOcrButton');
+    const ocrProgress = document.getElementById('ocrProgress');
+    const ocrError = document.getElementById('ocrError');
+    const ocrSuccess = document.getElementById('ocrSuccess');
+    
     // Batch operation elements
     const batchMoveCollection = document.getElementById('batchMoveCollection');
     const batchMoveCount = document.getElementById('batchMoveCount').querySelector('span');

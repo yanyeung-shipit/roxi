@@ -1,0 +1,50 @@
+Detection & Notification:
+
+User uploads a PDF and the system attempts normal text extraction
+If little or no text is extracted, the document would be marked as "Limited Text Content" in the document browser
+A clear indicator would show in the document details page that the document may need OCR
+User Interface:
+
+A button labeled "Apply OCR Processing" would appear in the document details page for eligible documents
+Clicking this would trigger the OCR job and show a progress indicator
+Once complete, the interface would refresh to show the newly extracted content
+Background Processing:
+
+The OCR job would be added to the existing processing queue with appropriate tagging
+Upon completion, the document would be updated with OCR-extracted text
+The embeddings would be regenerated based on the new text content
+
+Complexity and Stability Impact
+This approach has a moderate complexity impact but with good stability characteristics:
+
+Complexity Added:
+Frontend Changes:
+
+New UI elements for OCR status and triggering
+Status indicators for OCR processing state
+Moderate JavaScript changes for handling OCR requests
+Backend Changes:
+
+OCR processing module integration
+Additional document status tracking fields
+Extension of the existing processing queue mechanisms
+Database Changes:
+
+Minor schema changes to track OCR status and processing history
+No fundamental data model changes required
+Stability Considerations:
+Isolated Processing:
+
+On-demand OCR wouldn't affect regular document processing
+OCR failures would be limited to specific documents and user actions
+System-wide stability would be largely unaffected
+Resource Management:
+
+OCR jobs could be rate-limited or restricted based on server load
+Processing could be scheduled for lower-usage periods
+Resource allocation could be carefully controlled
+Error Containment:
+
+OCR failures would affect only the specific document being processed
+Regular system functionality would continue even if OCR fails
+User experience degradation would be limited to the OCR feature

@@ -3,8 +3,10 @@ import sqlalchemy as sa
 import os
 import shutil
 import datetime
+import logging
 from app import db
 from models import Document, ProcessingQueue, TextChunk, VectorEmbedding, Collection
+from utils.ocr_processor import update_document_extraction_quality, perform_ocr_on_document, add_to_ocr_queue
 
 # Create blueprint
 document_routes = Blueprint('documents', __name__, url_prefix='/documents')
@@ -949,4 +951,131 @@ def view_document_pdf(document_id):
         return jsonify({
             'success': False,
             'error': f"Failed to retrieve PDF: {str(e)}"
+        }), 500
+
+# OCR-related endpoints
+@document_routes.route('/api/documents/<int:document_id>/text-quality')
+def get_document_text_quality(document_id):
+    """
+    Get text extraction quality assessment for a document
+    """
+    try:
+        document = Document.query.get(document_id)
+        
+        if not document:
+            return jsonify({
+                'success': False,
+                'error': f'Document with ID {document_id} not found'
+            }), 404
+        
+        # If text_extraction_quality is not set, assess it now
+        if not document.text_extraction_quality or document.text_extraction_quality == 'unknown':
+            update_document_extraction_quality(document_id)
+            document = Document.query.get(document_id)
+        
+        return jsonify({
+            'success': True,
+            'document_id': document_id,
+            'text_extraction_quality': document.text_extraction_quality,
+            'ocr_status': document.ocr_status,
+            'ocr_requested_at': document.ocr_requested_at.isoformat() if document.ocr_requested_at else None,
+            'ocr_completed_at': document.ocr_completed_at.isoformat() if document.ocr_completed_at else None,
+            'ocr_error': document.ocr_error
+        })
+    except Exception as e:
+        logging.exception(f"Error getting document text quality: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to get document text quality: {str(e)}"
+        }), 500
+
+@document_routes.route('/api/documents/<int:document_id>/ocr', methods=['POST'])
+def request_ocr_processing(document_id):
+    """
+    Request OCR processing for a document
+    """
+    try:
+        document = Document.query.get(document_id)
+        
+        if not document:
+            return jsonify({
+                'success': False,
+                'error': f'Document with ID {document_id} not found'
+            }), 404
+        
+        # Check if document is already processed with OCR
+        if document.ocr_status == 'completed':
+            return jsonify({
+                'success': False,
+                'error': 'Document has already been processed with OCR'
+            }), 400
+        
+        # Check if document is already being processed
+        if document.ocr_status == 'processing':
+            return jsonify({
+                'success': False,
+                'error': 'Document is currently being processed with OCR'
+            }), 400
+        
+        # Add document to OCR processing queue
+        success, message = add_to_ocr_queue(document_id)
+        
+        if success:
+            # Start OCR processing immediately if possible
+            # This is a synchronous operation and might take some time
+            # In a production environment, you would use a task queue
+            success, ocr_message = perform_ocr_on_document(document_id)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': 'OCR processing completed successfully',
+                    'document_id': document_id
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'OCR processing failed: {ocr_message}',
+                    'document_id': document_id
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'error': message,
+                'document_id': document_id
+            }), 400
+    except Exception as e:
+        logging.exception(f"Error requesting OCR processing: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to request OCR processing: {str(e)}"
+        }), 500
+
+@document_routes.route('/api/documents/<int:document_id>/ocr/status')
+def get_ocr_status(document_id):
+    """
+    Get OCR processing status for a document
+    """
+    try:
+        document = Document.query.get(document_id)
+        
+        if not document:
+            return jsonify({
+                'success': False,
+                'error': f'Document with ID {document_id} not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'document_id': document_id,
+            'ocr_status': document.ocr_status,
+            'ocr_requested_at': document.ocr_requested_at.isoformat() if document.ocr_requested_at else None,
+            'ocr_completed_at': document.ocr_completed_at.isoformat() if document.ocr_completed_at else None,
+            'ocr_error': document.ocr_error
+        })
+    except Exception as e:
+        logging.exception(f"Error getting OCR status: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f"Failed to get OCR status: {str(e)}"
         }), 500
