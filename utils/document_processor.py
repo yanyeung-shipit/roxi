@@ -8,7 +8,7 @@ import time
 import queue
 from app import db, app
 from models import Document, TextChunk, VectorEmbedding, ProcessingQueue
-from utils.pdf_processor import extract_text_from_pdf, chunk_text
+from utils.pdf_processor import extract_text_from_pdf, chunk_text, clean_text
 from utils.embeddings import generate_embeddings
 from utils.doi_validator import extract_and_validate_doi, validate_doi_with_crossref
 from utils.citation_generator import generate_apa_citation
@@ -196,7 +196,8 @@ def process_document(document_id):
                     eular_match = re.search(pattern, text[:5000], re.IGNORECASE)
                     if eular_match:
                         title = f"EULAR recommendations for {eular_match.group(1).strip()}"
-                        document.title = title
+                        # Clean title to remove any <scp> tags
+                        document.title = clean_text(title)
                         # If it's an EULAR guideline, set journal to ARD if not already set
                         if not document.journal:
                             document.journal = "Annals of the Rheumatic Diseases"
@@ -207,7 +208,7 @@ def process_document(document_id):
                     title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text_sample)
                     
                 if title_match and document.title and "_" in document.title:
-                    document.title = title_match.group(1).strip()
+                    document.title = clean_text(title_match.group(1).strip())
             
             # Try to extract authors
             author_match = re.search(r'((?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+(?:,|;|\s+and|\s+&)\s+)+(?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+))', text_sample)
@@ -237,7 +238,7 @@ def process_document(document_id):
             title = metadata.get('title')
             if title and isinstance(title, list) and len(title) > 0:
                 # Use the full title, now that we've changed to TEXT type
-                document.title = title[0]
+                document.title = clean_text(title[0])
             
             # Get authors
             authors = metadata.get('author', [])
@@ -283,6 +284,7 @@ def process_document(document_id):
             logger.info(f"Updating document with PubMed data for document {document_id}")
             
             # Update with PubMed metadata
+            # PubMed titles are already cleaned in the pubmed_integration module
             document.title = pubmed_data.get('title') or document.title
             
             if pubmed_data.get('authors'):

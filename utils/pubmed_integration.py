@@ -19,6 +19,9 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any
 
+# Import the clean_text function
+from utils.pdf_processor import clean_text
+
 # Base URL for NCBI E-utilities
 EUTILS_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
@@ -169,9 +172,12 @@ def get_paper_details_by_pmid(pmid: str) -> Optional[Dict[str, Any]]:
         for term in article_data.get('meshheadinglist', []):
             mesh_terms.append(term)
         
+        # Clean the title to remove <scp> tags and other formatting artifacts
+        title = clean_text(article_data.get('title', ''))
+        
         return {
             'pmid': pmid,
-            'title': article_data.get('title', ''),
+            'title': title,
             'authors': authors,
             'journal': article_data.get('fulljournalname', ''),
             'publication_date': pub_date.isoformat() if pub_date else None,

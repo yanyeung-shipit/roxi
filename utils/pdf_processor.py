@@ -7,6 +7,27 @@ from flask import current_app
 
 logger = logging.getLogger(__name__)
 
+def clean_text(text):
+    """
+    Clean extracted text by removing XML/HTML-like tags and other formatting artifacts
+    
+    Args:
+        text (str): Text to clean
+        
+    Returns:
+        str: Cleaned text
+    """
+    if not text:
+        return text
+        
+    # Remove <scp> tags (small caps formatting commonly found in medical PDFs)
+    text = re.sub(r'</?scp>', '', text)
+    
+    # Remove other common formatting tags
+    text = re.sub(r'</?[a-z]+>', '', text)  # Simple HTML-like tags
+    
+    return text
+
 def extract_text_from_pdf(pdf_path):
     """
     Extract text content from a PDF file
@@ -26,6 +47,9 @@ def extract_text_from_pdf(pdf_path):
             for page_num in range(len(pdf_reader.pages)):
                 page = pdf_reader.pages[page_num]
                 text += page.extract_text() + "\n\n"
+        
+        # Clean the text to remove formatting artifacts
+        text = clean_text(text)
         
         return text
     except Exception as e:
