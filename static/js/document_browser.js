@@ -1794,7 +1794,21 @@ function checkDocumentTextQuality(documentId) {
         fetch(`/api/documents/${documentId}/ocr`, {
             method: 'POST'
         })
-        .then(response => response.json())
+        .then(response => {
+            // Check if response is OK (HTTP status between 200-299)
+            if (!response.ok) {
+                // Check content type to handle HTML error pages
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('text/html')) {
+                    throw new Error('Server error occurred. Please try again later.');
+                }
+            }
+            // Try to parse as JSON
+            return response.json().catch(err => {
+                console.error('JSON parse error:', err);
+                throw new Error('Invalid response from server. Please try again later.');
+            });
+        })
         .then(data => {
             if (!data.success) {
                 throw new Error(data.error || 'Failed to start OCR processing');
@@ -1818,7 +1832,21 @@ function checkDocumentTextQuality(documentId) {
         })
         .catch(error => {
             console.error('Error requesting OCR processing:', error);
-            ocrError.textContent = error.message;
+            ocrError.textContent = error.message || 'An error occurred during OCR processing';
+            ocrError.classList.remove('d-none');
+            ocrProgress.classList.add('d-none');
+            applyOcrButton.disabled = false;
+        });
+            else if (data.ocr_status === 'processing') {
+                ocrStatusBadge.textContent = 'OCR: Processing';
+                ocrStatusBadge.classList.remove('d-none');
+                // Start polling for status updates
+                pollOcrStatus(documentId, source);
+            }
+        })
+        .catch(error => {
+            console.error('Error requesting OCR processing:', error);
+            ocrError.textContent = error.message || 'An error occurred during OCR processing';
             ocrError.classList.remove('d-none');
             ocrProgress.classList.add('d-none');
             applyOcrButton.disabled = false;
@@ -1840,7 +1868,21 @@ function checkDocumentTextQuality(documentId) {
         
         const statusCheck = setInterval(() => {
             fetch(`/api/documents/${documentId}/ocr/status`)
-                .then(response => response.json())
+                .then(response => {
+                    // Check if response is OK (HTTP status between 200-299)
+                    if (!response.ok) {
+                        // Check content type to handle HTML error pages
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('text/html')) {
+                            throw new Error('Server error occurred. Please try again later.');
+                        }
+                    }
+                    // Try to parse as JSON
+                    return response.json().catch(err => {
+                        console.error('JSON parse error:', err);
+                        throw new Error('Invalid response from server. Please try again later.');
+                    });
+                })
                 .then(data => {
                     if (!data.success) {
                         throw new Error(data.error || 'Failed to get OCR status');
@@ -1848,6 +1890,35 @@ function checkDocumentTextQuality(documentId) {
                     
                     const status = data.ocr_status;
                     
+                    // Update status badge
+                    ocrStatusBadge.textContent = `OCR: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+                    
+                    // Process is complete or failed
+                    if (status === 'completed' || status === 'failed') {
+                        clearInterval(statusCheck);
+                        ocrProgress.classList.add('d-none');
+                        applyOcrButton.disabled = false;
+                        
+                        if (status === 'completed') {
+                            ocrSuccess.classList.remove('d-none');
+                            // Reload document details to show updated text
+                            showDocumentDetails(documentId);
+                        } else if (status === 'failed') {
+                            ocrError.textContent = data.ocr_error || 'OCR processing failed';
+                            ocrError.classList.remove('d-none');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking OCR status:', error);
+                    clearInterval(statusCheck);
+                    ocrError.textContent = error.message || 'An error occurred while checking OCR status';
+                    ocrError.classList.remove('d-none');
+                    ocrProgress.classList.add('d-none');
+                    applyOcrButton.disabled = false;
+                });
+        }, 3000); // Check every 3 seconds
+    }
                     // Update status badge
                     ocrStatusBadge.textContent = `OCR: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
                     

@@ -1021,23 +1021,46 @@ def request_ocr_processing(document_id):
         success, message = add_to_ocr_queue(document_id)
         
         if success:
-            # Start OCR processing immediately if possible
-            # This is a synchronous operation and might take some time
-            # In a production environment, you would use a task queue
-            success, ocr_message = perform_ocr_on_document(document_id)
-            
-            if success:
-                return jsonify({
-                    'success': True,
-                    'message': 'OCR processing completed successfully',
-                    'document_id': document_id
-                })
-            else:
+            try:
+                # Start OCR processing immediately if possible
+                # This is a synchronous operation and might take some time
+                # In a production environment, you would use a task queue
+                success, ocr_message = perform_ocr_on_document(document_id)
+                
+                if success:
+                    return jsonify({
+                        'success': True,
+                        'message': 'OCR processing completed successfully',
+                        'document_id': document_id,
+                        'ocr_status': 'completed'
+                    })
+                else:
+                    # Get the updated document to ensure we have the latest status
+                    updated_doc = Document.query.get(document_id)
+                    return jsonify({
+                        'success': False,
+                        'error': f'OCR processing failed: {ocr_message}',
+                        'document_id': document_id,
+                        'ocr_status': updated_doc.ocr_status
+                    }), 400  # Use 400 instead of 500 to prevent HTML error pages
+            except Exception as ocr_e:
+                logging.exception(f"OCR processing error: {str(ocr_e)}")
+                # Update document status in case it wasn't updated during the error
+                try:
+                    updated_doc = Document.query.get(document_id)
+                    if updated_doc.ocr_status != 'failed':
+                        updated_doc.ocr_status = 'failed'
+                        updated_doc.ocr_error = str(ocr_e)
+                        db.session.commit()
+                except Exception:
+                    logging.exception("Failed to update document OCR status after error")
+                
                 return jsonify({
                     'success': False,
-                    'error': f'OCR processing failed: {ocr_message}',
-                    'document_id': document_id
-                }), 500
+                    'error': f'OCR processing error: {str(ocr_e)}',
+                    'document_id': document_id,
+                    'ocr_status': 'failed'
+                }), 400  # Use 400 instead of 500 to prevent HTML error pages
         else:
             return jsonify({
                 'success': False,
@@ -1049,7 +1072,7 @@ def request_ocr_processing(document_id):
         return jsonify({
             'success': False,
             'error': f"Failed to request OCR processing: {str(e)}"
-        }), 500
+        }), 400  # Use 400 instead of 500 to prevent HTML error pages
 
 @document_routes.route('/api/documents/<int:document_id>/ocr/status')
 def get_ocr_status(document_id):
@@ -1078,4 +1101,4 @@ def get_ocr_status(document_id):
         return jsonify({
             'success': False,
             'error': f"Failed to get OCR status: {str(e)}"
-        }), 500
+        }), 400  # Use 400 instead of 500 to prevent HTML error pages
