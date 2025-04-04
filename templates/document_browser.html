@@ -414,10 +414,10 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/document_browser.js') }}"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         initDocumentBrowser();
+        // Use the file upload function from document_browser.js instead of main.js
         initFileUpload();
     });
 </script>
