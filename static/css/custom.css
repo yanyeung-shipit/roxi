@@ -63,7 +63,7 @@
 }
 
 .document-list {
-    max-height: calc(100vh - 350px);
+    max-height: calc(100vh - 250px);
     overflow-y: auto;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
