@@ -122,8 +122,11 @@ def process_document(document_id):
         # Extract text from the PDF and get quality assessment
         text, quality = extract_text_from_pdf(file_path)
         
-        if not text:
-            raise ValueError("Failed to extract text from PDF")
+        # Since we've updated extract_text_from_pdf to always return a string,
+        # we don't need to check if text is None, but we should log if it contains an error message
+        if text.startswith('[PDF') and 'error' in text.lower():
+            logger.warning(f"Text extraction issues for document {document_id}: {text}")
+            # We continue processing with the error message as text, so UI can show the status
         
         # Store the quality assessment
         document.text_extraction_quality = quality
