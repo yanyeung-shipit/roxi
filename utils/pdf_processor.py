@@ -28,79 +28,33 @@ def clean_text(text):
     
     return text
 
-def extract_text_from_pdf(pdf_path, check_quality=True):
+def extract_text_from_pdf(pdf_path):
     """
     Extract text content from a PDF file
     
     Args:
         pdf_path (str): Path to the PDF file
-        check_quality (bool): Whether to check text quality to determine OCR needs
         
     Returns:
-        tuple: (extracted_text, quality_assessment) where quality_assessment is one of:
-               'normal', 'low', or 'ocr_needed'
+        str: Extracted text from the PDF, or None if extraction failed
     """
     try:
         text = ""
-        
-        # Check if file exists and is readable
-        if not os.path.exists(pdf_path):
-            logger.error(f"PDF file not found: {pdf_path}")
-            return "[PDF file not found]", 'ocr_needed'
-            
         with open(pdf_path, 'rb') as pdf_file:
-            # Try to read the PDF
-            try:
-                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                
-                # Check if PDF is encrypted
-                if pdf_reader.is_encrypted:
-                    logger.warning(f"PDF is encrypted, attempting to decrypt: {pdf_path}")
-                    try:
-                        # Try with empty password
-                        success = pdf_reader.decrypt('')
-                        if not success:
-                            logger.error(f"Cannot decrypt PDF: {pdf_path}")
-                            return "[Encrypted PDF]", 'ocr_needed'
-                    except:
-                        logger.exception(f"Error decrypting PDF: {pdf_path}")
-                        return "[Encrypted PDF]", 'ocr_needed'
-                
-                # Extract text from each page
-                for page_num in range(len(pdf_reader.pages)):
-                    try:
-                        page = pdf_reader.pages[page_num]
-                        page_text = page.extract_text()
-                        if page_text:
-                            text += page_text + "\n\n"
-                    except Exception as e:
-                        logger.warning(f"Error extracting text from page {page_num}: {str(e)}")
-                
-            except Exception as e:
-                logger.exception(f"Error reading PDF with PyPDF2: {str(e)}")
-                return f"[PDF extraction error: {str(e)}]", 'ocr_needed'
-        
-        # If no text was extracted or text is very short, mark for OCR
-        if not text or len(text.strip()) < 100:
-            logger.warning(f"Little or no text extracted from PDF: {pdf_path}")
-            # Return a placeholder but non-empty text to avoid processing errors
-            return "[PDF contains minimal text - OCR recommended]", 'ocr_needed'
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            
+            # Extract text from each page
+            for page_num in range(len(pdf_reader.pages)):
+                page = pdf_reader.pages[page_num]
+                text += page.extract_text() + "\n\n"
         
         # Clean the text to remove formatting artifacts
         text = clean_text(text)
         
-        # Assess text quality if requested
-        quality = 'normal'
-        if check_quality and text:
-            # Import here to avoid circular imports
-            from utils.ocr_processor import estimate_text_quality
-            quality = estimate_text_quality(text)
-        
-        return text, quality
+        return text
     except Exception as e:
-        logger.exception(f"Unexpected error extracting text from PDF: {pdf_path}, {str(e)}")
-        # Return placeholder text instead of None to avoid downstream errors
-        return f"[PDF extraction error: {str(e)}]", 'ocr_needed'
+        logger.exception(f"Error extracting text from PDF: {pdf_path}")
+        return None
 
 def chunk_text(text, chunk_size=1000, overlap=200):
     """

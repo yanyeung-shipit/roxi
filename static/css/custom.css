@@ -84,42 +84,6 @@
     color: var(--bs-warning);
 }
 
-/* OCR related styles */
-.ocr-status-section {
-    margin-bottom: 1.5rem;
-}
-
-.ocr-status-section .card {
-    border-radius: 0.25rem;
-}
-
-.text-quality-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-weight: bold;
-}
-
-.quality-normal {
-    background-color: rgba(25, 135, 84, 0.2);
-    color: var(--bs-success);
-}
-
-.quality-low {
-    background-color: rgba(255, 193, 7, 0.2);
-    color: var(--bs-warning);
-}
-
-.quality-poor {
-    background-color: rgba(220, 53, 69, 0.2);
-    color: var(--bs-danger);
-}
-
-.quality-ocr {
-    background-color: rgba(13, 202, 240, 0.2);
-    color: var(--bs-info);
-}
-
 /* Tag badges */
 .tag-badge {
     margin-right: 0.25rem;
@@ -240,39 +204,4 @@
     margin-top: 4rem;
     padding-top: 1.5rem;
     padding-bottom: 1.5rem;
-}
-/* OCR related styles */
-.ocr-status-section {
-    margin-bottom: 1.5rem;
-}
-
-.ocr-status-section .card {
-    border-radius: 0.25rem;
-}
-
-.text-quality-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-weight: bold;
-}
-
-.quality-normal {
-    background-color: rgba(25, 135, 84, 0.2);
-    color: var(--bs-success);
-}
-
-.quality-low {
-    background-color: rgba(255, 193, 7, 0.2);
-    color: var(--bs-warning);
-}
-
-.quality-poor {
-    background-color: rgba(220, 53, 69, 0.2);
-    color: var(--bs-danger);
-}
-
-.quality-ocr {
-    background-color: rgba(13, 202, 240, 0.2);
-    color: var(--bs-info);
 }

@@ -48,32 +48,11 @@ class Document(db.Model):
     upload_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     processed = db.Column(db.Boolean, default=False)
     full_text = db.Column(db.Text)
-    # OCR tracking fields
-    text_extraction_quality = db.Column(db.String(20), default='normal')  # 'normal', 'low', 'ocr_needed', 'ocr_processed'
-    ocr_status = db.Column(db.String(20))  # null, 'pending', 'processing', 'completed', 'failed'
-    ocr_requested_at = db.Column(db.DateTime)
-    ocr_completed_at = db.Column(db.DateTime)
-    ocr_error = db.Column(db.Text)
     # Added collection_id foreign key
     collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=True)
     
     def __repr__(self):
         return f"<Document {self.id}: {self.title}>"
-        
-    @property
-    def needs_ocr(self):
-        """Determine if the document needs OCR processing based on text extraction quality"""
-        return self.text_extraction_quality == 'ocr_needed'
-        
-    @property
-    def ocr_in_progress(self):
-        """Check if OCR is currently being processed for this document"""
-        return self.ocr_status in ('pending', 'processing')
-        
-    @property
-    def ocr_failed(self):
-        """Check if OCR processing failed for this document"""
-        return self.ocr_status == 'failed'
 
 
 class TextChunk(db.Model):

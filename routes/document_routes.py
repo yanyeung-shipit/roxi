@@ -176,12 +176,7 @@ def get_document(document_id):
             'processed': document.processed,
             'tags': document.tags,
             'citation_apa': document.citation_apa,
-            'processing_status': processing_status,
-            'text_extraction_quality': document.text_extraction_quality,
-            'ocr_status': document.ocr_status,
-            'ocr_requested_at': document.ocr_requested_at.isoformat() if document.ocr_requested_at else None,
-            'ocr_completed_at': document.ocr_completed_at.isoformat() if document.ocr_completed_at else None,
-            'ocr_error': document.ocr_error
+            'processing_status': processing_status
         }
         
         # Add collection data if the model has been updated
