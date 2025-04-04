@@ -951,47 +951,4 @@ def view_document_pdf(document_id):
             'error': f"Failed to retrieve PDF: {str(e)}"
         }), 500
 
-# Document text quality endpoint
-@document_routes.route('/api/documents/<int:document_id>/text-quality')
-def get_document_text_quality(document_id):
-    """
-    Get text extraction quality assessment for a document
-    """
-    try:
-        document = Document.query.get(document_id)
-        
-        if not document:
-            return jsonify({
-                'success': False,
-                'error': f'Document with ID {document_id} not found'
-            }), 404
-        
-        # For now, return a simple assessment
-        # In the future, this could be updated with a proper assessment function
-        text_quality = 'good'
-        if document.full_text:
-            if len(document.full_text) < 1000:
-                text_quality = 'limited'
-            elif len(document.full_text) < 100:
-                text_quality = 'none'
-        else:
-            text_quality = 'none'
-            
-        # Update the document's text quality
-        document.text_extraction_quality = text_quality
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'document_id': document_id,
-            'text_extraction_quality': text_quality
-        })
-    except Exception as e:
-        logging.exception(f"Error getting document text quality: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': f"Failed to get document text quality: {str(e)}"
-        }), 500
-
-
-
+# Document text quality endpoint has been removed as OCR functionality is no longer needed

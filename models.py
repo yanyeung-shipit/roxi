@@ -51,8 +51,7 @@ class Document(db.Model):
     # Added collection_id foreign key
     collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=True)
     
-    # Text quality field (for future use)
-    text_extraction_quality = db.Column(db.String(20), default='unknown')  # 'good', 'limited', 'none'
+    # Text quality field has been removed as OCR functionality is no longer needed
     
     def __repr__(self):
         return f"<Document {self.id}: {self.title}>"
