@@ -1,0 +1,473 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="document-browser">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="mb-0">Document Browser</h1>
+            </div>
+            <p class="text-muted">Upload, browse and search your research document collection</p>
+        </div>
+    </div>
+
+<!-- Top Section: Upload and Search -->
+<div class="row mb-4">
+    <!-- Left Side: Upload Documents -->
+    <div class="col-md-6">
+        <div class="card bg-dark h-100">
+            <div class="card-body p-4">
+                <h4 class="card-title mb-3">Upload Documents</h4>
+                
+                <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data" class="upload-form">
+                    <div class="mb-3">
+                        <label for="uploadCollection" class="form-label">Collection</label>
+                        <select class="form-select" id="uploadCollection" name="collection_id">
+                            <option value="">None</option>
+                            <!-- Collections will be populated here -->
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="custom-file-upload">
+                            <input type="file" class="form-control" id="fileInput" name="files[]" multiple accept=".pdf">
+                            <div class="upload-area">
+                                <div class="text-center p-5">
+                                    <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
+                                    <p>Drag & drop PDFs here or click to browse</p>
+                                    <small class="text-muted">Maximum 50 files per upload</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" id="uploadButton" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i> Upload PDFs
+                        </button>
+                    </div>
+                    
+                    <!-- Upload Progress -->
+                    <div id="uploadProgress" class="progress mt-3 d-none">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    
+                    <!-- Upload Status -->
+                    <div id="uploadStatus" class="mt-3"></div>
+                    
+                    <!-- Processing Queue -->
+                    <div id="processingQueue" class="mt-3 d-none">
+                        <h6 class="mb-2">Processing Queue</h6>
+                        <div class="progress">
+                            <div id="queueProgress" class="progress-bar bg-info" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            <span id="queueInfo">0 / 0 processed</span>
+                        </small>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Side: Search and Filters -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h4 class="card-title mb-3">Search & Filter</h4>
+                
+                <div class="mb-4">
+                    <label for="searchInput" class="form-label">Search Documents</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by keyword, title, author, journal, or DOI">
+                    </div>
+                    <div class="text-end mt-1">
+                        <span class="badge bg-secondary" id="documentCount">0 documents</span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="collectionFilter" class="form-label">Filter by collection</label>
+                    <select class="form-select" id="collectionFilter">
+                        <option value="">All Collections</option>
+                        <!-- Collections will be loaded here -->
+                        <option value="-1" disabled>Loading collections...</option>
+                    </select>
+                </div>
+                
+                <div class="d-flex justify-content-between mt-4">
+                    <button class="btn btn-outline-secondary" id="manageCollectionsButton">
+                        <i class="fas fa-edit me-1"></i> Manage Collections
+                    </button>
+                    <button class="btn btn-outline-primary" id="newCollectionButton">
+                        <i class="fas fa-folder-plus me-1"></i> New Collection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Document Browser Section -->
+<div class="row">
+    <!-- Document List -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Documents</h5>
+                <div class="d-flex align-items-center">
+                    <div class="multi-select-toggle me-2">
+                        <button id="toggleMultiSelectBtn" class="btn btn-sm btn-outline-primary" title="Toggle multi-select mode">
+                            <i class="fas fa-check-square"></i>
+                        </button>
+                    </div>
+                    <button id="refreshDocumentsBtn" class="btn btn-sm btn-outline-secondary" title="Refresh document list">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- Multi-select action bar -->
+                <div id="multiSelectActions" class="p-2 bg-dark d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span id="selectedCount" class="text-light">0 selected</span>
+                        <div class="btn-group btn-group-sm">
+                            <button id="batchMoveBtn" class="btn btn-outline-primary" disabled>
+                                <i class="fas fa-folder-open me-1"></i> Move
+                            </button>
+                            <button id="batchDeleteBtn" class="btn btn-outline-danger" disabled>
+                                <i class="fas fa-trash me-1"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="documentList" class="document-list">
+                    <div class="text-center p-5">
+                        <div class="spinner-border text-secondary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Loading documents...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <nav>
+                    <ul id="pagination" class="pagination pagination-sm justify-content-center mb-0">
+                        <!-- Pagination will be inserted here by JavaScript -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Document Details -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Document Details</h5>
+            </div>
+            <div class="card-body">
+                <div id="documentDetails">
+                    <div class="text-center p-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        <p class="text-muted">Select a document to view details</p>
+                    </div>
+                </div>
+                <div class="mb-3 border-top pt-3 d-none" id="documentOcrSection">
+                    <h5>Document Text Extraction</h5>
+                    <div class="alert alert-warning" id="documentLimitedTextAlert">
+                        <strong>Limited Text Content Detected</strong>
+                        <p>This document appears to have limited or no text content that could be extracted. This may happen with scanned PDFs or documents with embedded images.</p>
+                        <p>You can apply OCR (Optical Character Recognition) processing to attempt to extract text from the document images.</p>
+                    </div>
+                    <div id="documentOcrStatus" class="mb-2">
+                        <span class="badge bg-secondary">Text Quality: <span id="documentTextQualityBadge">Unknown</span></span>
+                        <span class="badge bg-info d-none" id="documentOcrStatusBadge">OCR: Not Processed</span>
+                    </div>
+                    <button type="button" class="btn btn-warning" id="documentApplyOcrButton">
+                        <i class="fas fa-magic"></i> Apply OCR Processing
+                    </button>
+                    <div class="progress d-none mt-2" id="documentOcrProgress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                    <div class="alert alert-danger d-none mt-2" id="documentOcrError"></div>
+                    <div class="alert alert-success d-none mt-2" id="documentOcrSuccess">OCR processing completed successfully</div>
+                </div>
+                
+                <div class="action-buttons mt-3 d-none">
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-outline-secondary" id="editDocumentButton">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-outline-danger" id="deleteDocumentButton">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Document Modal -->
+<div class="modal fade" id="editDocumentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editDocumentForm">
+                    <input type="hidden" id="editDocumentId">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="editDocumentTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="editDocumentTitle" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentAuthors" class="form-label">Authors</label>
+                            <input type="text" class="form-control" id="editDocumentAuthors">
+                            <div class="form-text">Enter authors separated by commas</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentJournal" class="form-label">Journal</label>
+                            <input type="text" class="form-control" id="editDocumentJournal">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentPublicationDate" class="form-label">Publication Date</label>
+                            <input type="date" class="form-control" id="editDocumentPublicationDate">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentDOI" class="form-label">DOI</label>
+                            <input type="text" class="form-control" id="editDocumentDOI" placeholder="10.xxxx/xxxxx">
+                            <div class="form-text">Digital Object Identifier (e.g., 10.1016/j.jbspin.2021.105236)</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentCollection" class="form-label">Collection</label>
+                            <select class="form-select" id="editDocumentCollection">
+                                <option value="">None</option>
+                                <!-- Collections will be populated here -->
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editDocumentTags" class="form-label">Tags</label>
+                            <input type="text" class="form-control" id="editDocumentTags" placeholder="Enter tags separated by commas">
+                            <div class="form-text">Enter tags separated by commas (e.g., "rheumatoid arthritis, TNF inhibitors")</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Citation Preview</label>
+                            <div class="form-control bg-dark text-light p-3" id="citationPreview" style="min-height: 70px; font-style: italic;">
+                                Citation will be generated automatically after saving
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="mb-3 border-top pt-3 d-none" id="ocrSection">
+                <h5>Document Text Extraction</h5>
+                <div class="alert alert-warning" id="limitedTextAlert">
+                    <strong>Limited Text Content Detected</strong>
+                    <p>This document appears to have limited or no text content that could be extracted. This may happen with scanned PDFs or documents with embedded images.</p>
+                    <p>You can apply OCR (Optical Character Recognition) processing to attempt to extract text from the document images.</p>
+                </div>
+                <div id="ocrStatus" class="mb-2">
+                    <span class="badge bg-secondary">Text Quality: <span id="textQualityBadge">Unknown</span></span>
+                    <span class="badge bg-info d-none" id="ocrStatusBadge">OCR: Not Processed</span>
+                </div>
+                <button type="button" class="btn btn-warning" id="applyOcrButton">
+                    <i class="bi bi-magic"></i> Apply OCR Processing
+                </button>
+                <div class="progress d-none mt-2" id="ocrProgress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+                <div class="alert alert-danger d-none mt-2" id="ocrError"></div>
+                <div class="alert alert-success d-none mt-2" id="ocrSuccess">OCR processing completed successfully</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="viewPdfButton"><i class="bi bi-file-earmark-pdf"></i> View PDF</button>
+                <button type="button" class="btn btn-primary" id="saveDocumentButton">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Collection Modal -->
+<div class="modal fade" id="collectionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="collectionModalTitle">New Collection</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="collectionForm">
+                    <input type="hidden" id="collectionId">
+                    <div class="mb-3">
+                        <label for="collectionName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="collectionName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="collectionParent" class="form-label">Parent Collection</label>
+                        <select class="form-select" id="collectionParent">
+                            <option value="">None (Root Collection)</option>
+                            <!-- Collection options will be populated here -->
+                        </select>
+                        <div class="form-text">Select a parent to create a nested collection</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="collectionDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="collectionDescription" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger d-none" id="deleteCollectionButton">Delete</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveCollectionButton">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Collections Modal -->
+<div class="modal fade" id="manageCollectionsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Collections</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Path</th>
+                                <th>Documents</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collectionsTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center">
+                                    <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="ms-2">Loading collections...</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="addCollectionBtn">
+                    <i class="fas fa-folder-plus"></i> New Collection
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="deleteConfirmMessage">
+                Are you sure you want to delete this item? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteButton">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Move Modal -->
+<div class="modal fade" id="batchMoveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Move Documents to Collection</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="batchMoveCount" class="mb-3">
+                    <span class="badge bg-primary">0</span> documents selected
+                </div>
+                <div class="mb-3">
+                    <label for="batchMoveCollection" class="form-label">Target Collection</label>
+                    <select class="form-select" id="batchMoveCollection">
+                        <option value="">None (Root)</option>
+                        <!-- Collections will be populated here -->
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmBatchMoveButton">Move Documents</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Delete Modal -->
+<div class="modal fade" id="batchDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Batch Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="batchDeleteWarning">
+                        You are about to delete <span id="batchDeleteCount" class="fw-bold">0</span> documents. 
+                        This action cannot be undone and will permanently delete the selected documents and their content.
+                    </span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmBatchDeleteButton">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div> <!-- Close document-browser div -->
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/document_browser.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initDocumentBrowser();
+        initFileUpload();
+    });
+</script>
+{% endblock %}
