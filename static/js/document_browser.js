@@ -248,7 +248,7 @@ function initDocumentBrowser() {
         `;
         
         // Call API to move documents
-        fetch('/documents/api/documents/batch/move', {
+        fetch('/api/documents/batch/move', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -300,7 +300,7 @@ function initDocumentBrowser() {
         `;
         
         // Call API to delete documents
-        fetch('/documents/api/documents/batch/delete', {
+        fetch('/api/documents/batch/delete', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -375,7 +375,7 @@ function initDocumentBrowser() {
         }
         
         // Fetch documents
-        fetch(`/documents/api/documents?${params.toString()}`)
+        fetch(`/api/documents?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
@@ -547,7 +547,7 @@ function initDocumentBrowser() {
      * Load all available tags
      */
     function loadTags() {
-        fetch('/documents/api/tags')
+        fetch('/api/tags')
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
@@ -660,7 +660,7 @@ function initDocumentBrowser() {
         }
         
         // Fetch document details
-        fetch(`/documents/api/documents/${documentId}`)
+        fetch(`/api/documents/${documentId}`)
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
@@ -756,7 +756,7 @@ function initDocumentBrowser() {
                         const id = link.dataset.collectionId;
                         
                         // Get collection data
-                        fetch(`/documents/api/collections/${id}`)
+                        fetch(`/api/collections/${id}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (!data.success) {
@@ -980,7 +980,7 @@ function initDocumentBrowser() {
         `;
         
         // Get the latest collections data
-        fetch('/documents/api/collections')
+        fetch('/api/collections')
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
@@ -1039,7 +1039,7 @@ function initDocumentBrowser() {
                         manageCollectionsModal.hide();
                         
                         // Load collection data
-                        fetch(`/documents/api/collections/${id}`)
+                        fetch(`/api/collections/${id}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (!data.success) {
@@ -1103,7 +1103,7 @@ function initDocumentBrowser() {
      * Load collections
      */
     function loadCollections() {
-        fetch('/documents/api/collections')
+        fetch('/api/collections')
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
@@ -1330,7 +1330,7 @@ function initDocumentBrowser() {
                 return;
             }
             
-            fetch(`/documents/api/documents/${currentDocumentId}`)
+            fetch(`/api/documents/${currentDocumentId}`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.success) {
@@ -1397,7 +1397,7 @@ function initDocumentBrowser() {
             const docId = editDocumentId.value;
             if (docId) {
                 // Open PDF in a new tab/window
-                window.open(`/documents/api/documents/${docId}/pdf`, '_blank');
+                window.open(`/api/documents/${docId}/pdf`, '_blank');
             }
         });
     }
@@ -1440,7 +1440,7 @@ function initDocumentBrowser() {
             }
             
             // Update document
-            fetch(`/documents/api/documents/${docId}`, {
+            fetch(`/api/documents/${docId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1499,7 +1499,7 @@ function initDocumentBrowser() {
             }
             
             // Create or update collection
-            const url = id ? `/documents/api/collections/${id}` : '/documents/api/collections';
+            const url = id ? `/api/collections/${id}` : '/api/collections';
             const method = id ? 'PUT' : 'POST';
             
             fetch(url, {
@@ -1567,10 +1567,10 @@ function initDocumentBrowser() {
             let successMessage = '';
             
             if (deleteType === 'document') {
-                url = `/documents/api/documents/${deleteId}`;
+                url = `/api/documents/${deleteId}`;
                 successMessage = 'Document deleted successfully.';
             } else if (deleteType === 'collection') {
-                url = `/documents/api/collections/${deleteId}`;
+                url = `/api/collections/${deleteId}`;
                 successMessage = 'Collection deleted successfully.';
             }
             
@@ -1676,7 +1676,7 @@ function checkDocumentTextQuality(documentId) {
         }
         
         // Fetch text quality info
-        fetch(`/documents/api/documents/${documentId}/text-quality`)
+        fetch(`/api/documents/${documentId}/text-quality`)
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
@@ -1791,7 +1791,7 @@ function checkDocumentTextQuality(documentId) {
         ocrSuccess.classList.add('d-none');
         
         // Call API to start OCR processing
-        fetch(`/documents/api/documents/${documentId}/ocr`, {
+        fetch(`/api/documents/${documentId}/ocr`, {
             method: 'POST'
         })
         .then(response => response.json())
@@ -1839,7 +1839,7 @@ function checkDocumentTextQuality(documentId) {
         const applyOcrButton = document.getElementById(source === 'document' ? 'documentApplyOcrButton' : 'applyOcrButton');
         
         const statusCheck = setInterval(() => {
-            fetch(`/documents/api/documents/${documentId}/ocr/status`)
+            fetch(`/api/documents/${documentId}/ocr/status`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.success) {

@@ -9,9 +9,10 @@ from models import Document, ProcessingQueue, TextChunk, VectorEmbedding, Collec
 from utils.ocr_processor import update_document_extraction_quality, perform_ocr_on_document, add_to_ocr_queue
 
 # Create blueprint
-document_routes = Blueprint('documents', __name__, url_prefix='/documents')
+document_routes = Blueprint('documents', __name__)
 
 @document_routes.route('/')
+@document_routes.route('/documents')  # Keep old route for compatibility
 def document_browser():
     """Render the document browser page"""
     return render_template('document_browser.html')
