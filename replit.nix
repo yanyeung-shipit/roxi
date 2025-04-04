@@ -1,6 +1,5 @@
 {pkgs}: {
   deps = [
-    pkgs.poppler
     pkgs.zlib
     pkgs.tk
     pkgs.tcl
