@@ -39,10 +39,11 @@ from celery_config import setup_celery
 celery = setup_celery(app)
 
 # Import and register blueprints
-from routes import main_routes, document_routes, monitoring_routes
+from routes import main_routes, document_routes, monitoring_routes, ocr_routes
 app.register_blueprint(main_routes)
 app.register_blueprint(document_routes)
 app.register_blueprint(monitoring_routes)
+app.register_blueprint(ocr_routes)
 
 # Create database tables
 with app.app_context():

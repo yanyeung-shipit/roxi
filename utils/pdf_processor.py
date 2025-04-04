@@ -28,15 +28,17 @@ def clean_text(text):
     
     return text
 
-def extract_text_from_pdf(pdf_path):
+def extract_text_from_pdf(pdf_path, check_quality=True):
     """
     Extract text content from a PDF file
     
     Args:
         pdf_path (str): Path to the PDF file
+        check_quality (bool): Whether to check text quality to determine OCR needs
         
     Returns:
-        str: Extracted text from the PDF, or None if extraction failed
+        tuple: (extracted_text, quality_assessment) where quality_assessment is one of:
+               'normal', 'low', or 'ocr_needed'
     """
     try:
         text = ""
@@ -46,15 +48,24 @@ def extract_text_from_pdf(pdf_path):
             # Extract text from each page
             for page_num in range(len(pdf_reader.pages)):
                 page = pdf_reader.pages[page_num]
-                text += page.extract_text() + "\n\n"
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n\n"
         
         # Clean the text to remove formatting artifacts
         text = clean_text(text)
         
-        return text
+        # Assess text quality if requested
+        quality = 'normal'
+        if check_quality and text:
+            # Import here to avoid circular imports
+            from utils.ocr_processor import estimate_text_quality
+            quality = estimate_text_quality(text)
+        
+        return text, quality
     except Exception as e:
         logger.exception(f"Error extracting text from PDF: {pdf_path}")
-        return None
+        return None, 'ocr_needed'
 
 def chunk_text(text, chunk_size=1000, overlap=200):
     """

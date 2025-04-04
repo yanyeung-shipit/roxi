@@ -1,3 +1,4 @@
 from routes.main_routes import main_routes
 from routes.document_routes import document_routes
 from routes.monitoring_routes import monitoring_routes
+from routes.ocr_routes import ocr_routes

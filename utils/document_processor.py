@@ -119,11 +119,18 @@ def process_document(document_id):
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"PDF file not found: {file_path}")
         
-        # Extract text from the PDF
-        text = extract_text_from_pdf(file_path)
+        # Extract text from the PDF and get quality assessment
+        text, quality = extract_text_from_pdf(file_path)
         
         if not text:
             raise ValueError("Failed to extract text from PDF")
+        
+        # Store the quality assessment
+        document.text_extraction_quality = quality
+        
+        # Log a warning if OCR might be needed
+        if quality == 'ocr_needed':
+            logger.warning(f"Document {document_id} may require OCR processing for better text extraction")
         
         # Store the full text in the document
         document.full_text = text
@@ -132,11 +139,11 @@ def process_document(document_id):
         import re
         doi = None
         # Look for DOI in first 1000 characters (usually contains citation info)
-        text_sample = text[:1000]
+        text_sample = text[:1000] if isinstance(text, str) else ""
         
         # Check if this is potentially a EULAR guideline document based on title or content
         is_eular_guideline = False
-        if "EULAR" in text[:5000] or "European League Against Rheumatism" in text[:5000]:
+        if isinstance(text, str) and ("EULAR" in text[:5000] or "European League Against Rheumatism" in text[:5000]):
             is_eular_guideline = True
             logger.info(f"Detected possible EULAR guideline document: {document_id}")
             
@@ -193,7 +200,10 @@ def process_document(document_id):
                 ]
                 
                 for pattern in eular_patterns:
-                    eular_match = re.search(pattern, text[:5000], re.IGNORECASE)
+                    if isinstance(text, str):
+                        eular_match = re.search(pattern, text[:5000], re.IGNORECASE)
+                    else:
+                        eular_match = None
                     if eular_match:
                         title = f"EULAR recommendations for {eular_match.group(1).strip()}"
                         # Clean title to remove any <scp> tags
@@ -395,6 +405,78 @@ def process_document(document_id):
             logger.exception("Failed to update queue entry with error status")
         
         return False
+
+def update_document_chunks(document_id):
+    """
+    Update document chunks and embeddings, typically after text content changes
+    such as after OCR processing
+    
+    Args:
+        document_id (int): The ID of the document to update
+        
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    logger.info(f"Updating chunks and embeddings for document: {document_id}")
+    
+    try:
+        # Get the document
+        document = Document.query.get(document_id)
+        
+        if not document or not document.full_text:
+            logger.error(f"Document not found or no text content: {document_id}")
+            return False
+        
+        # Delete existing chunks and embeddings
+        chunks = TextChunk.query.filter_by(document_id=document_id).all()
+        for chunk in chunks:
+            # Delete associated embedding
+            embedding = VectorEmbedding.query.filter_by(chunk_id=chunk.id).first()
+            if embedding:
+                db.session.delete(embedding)
+            
+            # Delete the chunk
+            db.session.delete(chunk)
+        
+        # Commit deletion
+        db.session.commit()
+        
+        # Split text into chunks
+        chunks = chunk_text(document.full_text)
+        
+        # Process each chunk
+        for i, chunk_content in enumerate(chunks):
+            # Create text chunk record
+            chunk = TextChunk(
+                document_id=document.id,
+                text=chunk_content,
+                chunk_index=i
+            )
+            db.session.add(chunk)
+            db.session.flush()  # Get the chunk ID
+            
+            # Generate embeddings
+            embedding = generate_embeddings(chunk_content)
+            
+            if embedding:
+                # Create embedding record
+                vector_embedding = VectorEmbedding(
+                    chunk_id=chunk.id,
+                    embedding=embedding
+                )
+                db.session.add(vector_embedding)
+        
+        # Commit all changes
+        db.session.commit()
+        
+        logger.info(f"Successfully updated chunks and embeddings for document: {document_id}")
+        return True
+        
+    except Exception as e:
+        logger.exception(f"Error updating chunks for document {document_id}: {str(e)}")
+        db.session.rollback()
+        return False
+
 
 def generate_tags_from_content(text, document=None, metadata=None):
     """
