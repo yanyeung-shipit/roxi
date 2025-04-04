@@ -22,18 +22,13 @@
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
-    border-top: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 0;
-    margin: 0 !important;
-    padding: 0 !important;
+    margin-bottom: 8px !important;
     height: auto;
     min-height: 25px;
 }
 
 .document-card .card-body {
-    padding: 4px 8px;
-    margin-bottom: 0;
+    padding: 8px 12px;
 }
 
 .document-card:hover {
@@ -72,7 +67,6 @@
     max-height: calc(100vh - 350px);
     min-height: 600px;
     overflow-y: auto;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Make document details scrollable */
@@ -93,12 +87,10 @@
 
 /* Tag badges */
 .tag-badge {
-    margin-right: 0.15rem;
-    margin-bottom: 0.15rem;
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    padding: 0.15em 0.4em;
-    font-size: 0.7em;
 }
 
 .tag-badge:hover {
@@ -110,7 +102,7 @@
 }
 
 .tag-list {
-    padding: 0.2rem 0;
+    padding: 0.5rem 0;
 }
 
 /* Citation and metadata */

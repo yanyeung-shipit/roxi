@@ -452,7 +452,7 @@ function initDocumentBrowser() {
         // Create document cards
         documents.forEach(doc => {
             const tags = doc.tags ? doc.tags.slice(0, 5).map(tag => 
-                `<span class="badge bg-secondary tag-badge">${escapeHtml(tag)}</span>`
+                `<span class="badge bg-secondary tag-badge" style="font-size: 0.75rem;">${escapeHtml(tag)}</span>`
             ).join('') : '';
             
             const statusIcon = doc.processed ? 
@@ -461,7 +461,7 @@ function initDocumentBrowser() {
             
             // Show collection badge if available
             const collectionBadge = doc.collection 
-                ? `<span class="badge bg-primary collection-badge me-2"><i class="fas fa-folder me-1"></i>${escapeHtml(doc.collection.name)}</span>` 
+                ? `<span class="badge bg-primary collection-badge me-2" style="font-size: 0.75rem;"><i class="fas fa-folder me-1"></i>${escapeHtml(doc.collection.name)}</span>` 
                 : '';
             
             // Check if this document is selected in multi-select mode
@@ -482,20 +482,20 @@ function initDocumentBrowser() {
             
             card.innerHTML = `
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="d-flex justify-content-between align-items-start">
                         <div class="d-flex align-items-start">
                             ${checkboxHtml}
-                            <div style="line-height: 1.1;">
-                                <div class="card-title mb-0 text-truncate" style="max-width: 400px; font-size: 0.85rem; font-weight: bold;">${escapeHtml(doc.title)}</div>
-                                <div class="d-flex">
-                                    <small class="text-muted text-truncate me-2" style="max-width: 250px; font-size: 0.7rem;">${escapeHtml(doc.authors || 'Unknown Authors')}</small>
-                                    <small class="text-muted" style="font-size: 0.7rem;">${formatDate(doc.publication_date || doc.upload_date)}</small>
+                            <div>
+                                <h6 class="card-title mb-0 text-truncate" style="max-width: 400px; font-size: 0.95rem;">${escapeHtml(doc.title)}</h6>
+                                <div class="d-flex mt-1">
+                                    <small class="text-muted text-truncate me-2" style="max-width: 250px; font-size: 0.8rem;">${escapeHtml(doc.authors || 'Unknown Authors')}</small>
+                                    <small class="text-muted" style="font-size: 0.8rem;">${formatDate(doc.publication_date || doc.upload_date)}</small>
                                 </div>
                             </div>
                         </div>
                         ${statusIcon}
                     </div>
-                    <div class="d-flex flex-wrap align-items-center" style="font-size: 0.7rem; line-height: 1;">
+                    <div class="d-flex flex-wrap mt-1 align-items-center" style="font-size: 0.8rem;">
                         ${collectionBadge}
                         ${tags}
                     </div>
