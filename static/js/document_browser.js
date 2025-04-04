@@ -1676,7 +1676,7 @@ function checkDocumentTextQuality(documentId) {
         }
         
         // Fetch text quality info
-        fetch(`/api/documents/${documentId}/text-quality`)
+        fetch(`/documents/api/documents/${documentId}/text-quality`)
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
