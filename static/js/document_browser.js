@@ -1791,7 +1791,7 @@ function checkDocumentTextQuality(documentId) {
         ocrSuccess.classList.add('d-none');
         
         // Call API to start OCR processing
-        fetch(`/documents/api/documents/${documentId}/ocr`, {
+        fetch(`/api/documents/${documentId}/ocr`, {
             method: 'POST'
         })
         .then(response => response.json())
@@ -1839,7 +1839,7 @@ function checkDocumentTextQuality(documentId) {
         const applyOcrButton = document.getElementById(source === 'document' ? 'documentApplyOcrButton' : 'applyOcrButton');
         
         const statusCheck = setInterval(() => {
-            fetch(`/documents/api/documents/${documentId}/ocr/status`)
+            fetch(`/api/documents/${documentId}/ocr/status`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.success) {
