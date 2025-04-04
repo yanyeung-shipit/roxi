@@ -459,9 +459,10 @@ function initDocumentBrowser() {
                 '<span class="document-status-pending"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>';
             
             // Show collection badge if available
-            const collectionBadge = doc.collection 
-                ? `<span class="badge bg-primary collection-badge me-2" style="font-size: 0.75rem;"><i class="fas fa-folder me-1"></i>${escapeHtml(doc.collection.name)}</span>` 
-                : '';
+            let collectionBadge = '';
+            if (doc.collection_id && doc.collection_name) {
+                collectionBadge = `<span class="badge bg-primary collection-badge me-2" style="font-size: 0.75rem;"><i class="fas fa-folder me-1"></i>${escapeHtml(doc.collection_name)}</span>`;
+            }
             
             // Check if this document is selected in multi-select mode
             const isSelected = selectedDocuments.includes(doc.id.toString());

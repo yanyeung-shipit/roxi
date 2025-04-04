@@ -80,7 +80,7 @@ def list_documents():
             }
             
             # Add collection info if available
-            if hasattr(doc, 'collection_id') and doc.collection_id:
+            if doc.collection_id is not None:
                 collection = Collection.query.get(doc.collection_id)
                 if collection:
                     doc_data['collection_id'] = doc.collection_id
@@ -160,7 +160,7 @@ def get_document(document_id):
         
         # Get collection info if available
         collection_name = None
-        if hasattr(document, 'collection_id') and document.collection_id:
+        if document.collection_id is not None:
             collection = Collection.query.get(document.collection_id)
             if collection:
                 collection_name = collection.name
@@ -181,10 +181,9 @@ def get_document(document_id):
             'processing_status': processing_status
         }
         
-        # Add collection data if the model has been updated
-        if hasattr(document, 'collection_id'):
-            doc_data['collection_id'] = document.collection_id
-            doc_data['collection_name'] = collection_name
+        # Add collection data
+        doc_data['collection_id'] = document.collection_id
+        doc_data['collection_name'] = collection_name
         
         return jsonify(doc_data)
     except Exception as e:
@@ -255,8 +254,8 @@ def update_document(document_id):
         if 'tags' in data:
             document.tags = data['tags']
         
-        # Update collection if the model supports it and collection_id is provided
-        if hasattr(document, 'collection_id') and 'collection_id' in data:
+        # Update collection if collection_id is provided
+        if 'collection_id' in data:
             collection_id = data['collection_id']
             
             # Verify collection exists if not None
@@ -289,7 +288,7 @@ def update_document(document_id):
                 'publication_date': document.publication_date.isoformat() if document.publication_date else None,
                 'citation_apa': document.citation_apa,
                 'tags': document.tags,
-                'collection_id': document.collection_id if hasattr(document, 'collection_id') else None
+                'collection_id': document.collection_id
             }
         })
     except Exception as e:
