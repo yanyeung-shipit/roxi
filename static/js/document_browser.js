@@ -734,33 +734,32 @@ function initDocumentBrowser() {
                 
                 // Sort collections for other operations
                 collections.sort((a, b) => a.name.localeCompare(b.name));
-            });
-            
-/**
-             * Check if a collection is a descendant of another collection
-             * @param {number} collectionId - The ID of the collection to check
-             * @param {number} potentialAncestorId - The ID of the potential ancestor
-             * @returns {boolean} - True if collectionId is a descendant of potentialAncestorId
-             */
-            function collectionIsDescendantOf(collectionId, potentialAncestorId) {
-                const collection = collections.find(c => c.id === collectionId);
-                if (!collection) return false;
-                
-                // If this collection has the potential ancestor as parent, it's a descendant
-                if (collection.parent_id === potentialAncestorId) return true;
-                
-                // If this collection has no parent, it's not a descendant
-                if (!collection.parent_id) return false;
-                
-                // Recursively check if this collection's parent is a descendant
-                return collectionIsDescendantOf(collection.parent_id, potentialAncestorId);
-            }
-            
+            })
             .catch(error => {
                 console.error('Error loading collections:', error);
                 // Show error toast
                 showAlert('Error loading collections. Please try again.', 'danger');
             });
+    }
+    
+    /**
+     * Check if a collection is a descendant of another collection
+     * @param {number} collectionId - The ID of the collection to check
+     * @param {number} potentialAncestorId - The ID of the potential ancestor
+     * @returns {boolean} - True if collectionId is a descendant of potentialAncestorId
+     */
+    function collectionIsDescendantOf(collectionId, potentialAncestorId) {
+        const collection = collections.find(c => c.id === collectionId);
+        if (!collection) return false;
+        
+        // If this collection has the potential ancestor as parent, it's a descendant
+        if (collection.parent_id === potentialAncestorId) return true;
+        
+        // If this collection has no parent, it's not a descendant
+        if (!collection.parent_id) return false;
+        
+        // Recursively check if this collection's parent is a descendant
+        return collectionIsDescendantOf(collection.parent_id, potentialAncestorId);
     }
     
     // Initial collections load
