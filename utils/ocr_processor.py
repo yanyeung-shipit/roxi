@@ -188,9 +188,9 @@ def add_to_ocr_queue(document_id: int) -> Tuple[bool, str]:
         return False, f"Document {document_id} not found"
     
     # Check if document is already in the processing queue
-    existing_queue = ProcessingQueue.query.filter_by(
-        document_id=document_id, 
-        status__in=['pending', 'processing']
+    existing_queue = ProcessingQueue.query.filter(
+        ProcessingQueue.document_id == document_id,
+        ProcessingQueue.status.in_(['pending', 'processing'])
     ).first()
     
     if existing_queue:

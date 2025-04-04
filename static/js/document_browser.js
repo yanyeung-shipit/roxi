@@ -57,19 +57,9 @@ function initDocumentBrowser() {
     const confirmDeleteButton = document.getElementById('confirmDeleteButton');
     const viewPdfButton = document.getElementById('viewPdfButton');
     
-    // OCR elements
-    const ocrSection = document.getElementById('ocrSection');
-    const textQualityBadge = document.getElementById('textQualityBadge');
-    const ocrStatusBadge = document.getElementById('ocrStatusBadge');
-    const applyOcrButton = document.getElementById('applyOcrButton');
-    const ocrProgress = document.getElementById('ocrProgress');
-    const ocrError = document.getElementById('ocrError');
-    const ocrSuccess = document.getElementById('ocrSuccess');
+    // Document details OCR elements - initialized on demand in checkDocumentTextQuality()
     
-    // Batch operation elements
-    const batchMoveCollection = document.getElementById('batchMoveCollection');
-    const batchMoveCount = document.getElementById('batchMoveCount').querySelector('span');
-    const confirmBatchMoveButton = document.getElementById('confirmBatchMoveButton');
+    // Modal OCR elements - initialized on demand in checkDocumentTextQuality()
     const batchDeleteCount = document.getElementById('batchDeleteCount');
     const confirmBatchDeleteButton = document.getElementById('confirmBatchDeleteButton');
     
@@ -737,6 +727,9 @@ function initDocumentBrowser() {
                 if (actionButtons) {
                     actionButtons.classList.remove('d-none');
                 }
+                
+                // Check document text quality and OCR status
+                checkDocumentTextQuality(documentId);
                 
                 // Add click handlers for collection links
                 const collectionLinks = documentDetails.querySelectorAll('.collection-link');
@@ -1640,3 +1633,249 @@ function initDocumentBrowser() {
         });
     }
 }
+    /**
+     * Check document text quality and update OCR section
+     */
+    }
+    /**
+     * Check document text quality and update OCR section
+     */
+    function checkDocumentTextQuality(documentId) {
+        // Get OCR UI elements for document panel
+        const documentOcrSection = document.getElementById('documentOcrSection');
+        const documentOcrStatusBadge = document.getElementById('documentOcrStatusBadge');
+        const documentTextQualityBadge = document.getElementById('documentTextQualityBadge');
+        const documentOcrError = document.getElementById('documentOcrError');
+        const documentOcrSuccess = document.getElementById('documentOcrSuccess');
+        const documentOcrProgress = document.getElementById('documentOcrProgress');
+        const documentApplyOcrButton = document.getElementById('documentApplyOcrButton');
+        
+        // Get OCR UI elements for modal
+        const modalOcrSection = document.getElementById('ocrSection');
+        const modalOcrStatusBadge = document.getElementById('ocrStatusBadge');
+        const modalTextQualityBadge = document.getElementById('textQualityBadge');
+        const modalOcrError = document.getElementById('ocrError');
+        const modalOcrSuccess = document.getElementById('ocrSuccess');
+        const modalOcrProgress = document.getElementById('ocrProgress');
+        const modalApplyOcrButton = document.getElementById('applyOcrButton');
+        
+        // Reset document OCR UI elements
+        if (documentOcrSection) {
+            documentOcrSection.classList.add('d-none');
+            documentOcrStatusBadge.classList.add('d-none');
+            documentOcrError.classList.add('d-none');
+            documentOcrSuccess.classList.add('d-none');
+            documentOcrProgress.classList.add('d-none');
+        }
+        
+        // Reset modal OCR UI elements
+        if (modalOcrSection) {
+            modalOcrSection.classList.add('d-none');
+            modalOcrStatusBadge.classList.add('d-none');
+            modalOcrError.classList.add('d-none');
+            modalOcrSuccess.classList.add('d-none');
+            modalOcrProgress.classList.add('d-none');
+        }
+        
+        // Fetch text quality info
+        fetch(`/documents/api/documents/${documentId}/text_quality`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to get text quality information');
+                }
+                
+                // Update UI based on text quality
+                const quality = data.text_extraction_quality;
+                const capitalizedQuality = quality.charAt(0).toUpperCase() + quality.slice(1);
+                
+                // Update document badges
+                if (documentTextQualityBadge) {
+                    documentTextQualityBadge.textContent = capitalizedQuality;
+                }
+                
+                // Update modal badges
+                if (modalTextQualityBadge) {
+                    modalTextQualityBadge.textContent = capitalizedQuality;
+                }
+                
+                // Get OCR status
+                const ocrStatus = data.ocr_status;
+                
+                // Only show OCR section if text quality is limited or none
+                if (quality === 'limited' || quality === 'none') {
+                    // Update document panel
+                    if (documentOcrSection) {
+                        documentOcrSection.classList.remove('d-none');
+                        
+                        // Update OCR status badge if available
+                        if (ocrStatus) {
+                            documentOcrStatusBadge.textContent = `OCR: ${ocrStatus.charAt(0).toUpperCase() + ocrStatus.slice(1)}`;
+                            documentOcrStatusBadge.classList.remove('d-none');
+                            
+                            // Disable button if OCR is in progress
+                            documentApplyOcrButton.disabled = (ocrStatus === 'processing');
+                            
+                            // Show success message if OCR is completed
+                            if (ocrStatus === 'completed') {
+                                documentOcrSuccess.classList.remove('d-none');
+                            }
+                            
+                            // Show error message if OCR failed
+                            if (ocrStatus === 'failed' && data.ocr_error) {
+                                documentOcrError.textContent = data.ocr_error;
+                                documentOcrError.classList.remove('d-none');
+                            }
+                        }
+                        
+                        // Set up document OCR button event handler (only once)
+                        if (!documentApplyOcrButton.hasOcrEventListener) {
+                            documentApplyOcrButton.addEventListener('click', () => requestOcrProcessing(documentId, 'document'));
+                            documentApplyOcrButton.hasOcrEventListener = true;
+                        }
+                    }
+                    
+                    // Update modal
+                    if (modalOcrSection) {
+                        modalOcrSection.classList.remove('d-none');
+                        
+                        // Update OCR status badge if available
+                        if (ocrStatus) {
+                            modalOcrStatusBadge.textContent = `OCR: ${ocrStatus.charAt(0).toUpperCase() + ocrStatus.slice(1)}`;
+                            modalOcrStatusBadge.classList.remove('d-none');
+                            
+                            // Disable button if OCR is in progress
+                            modalApplyOcrButton.disabled = (ocrStatus === 'processing');
+                            
+                            // Show success message if OCR is completed
+                            if (ocrStatus === 'completed') {
+                                modalOcrSuccess.classList.remove('d-none');
+                            }
+                            
+                            // Show error message if OCR failed
+                            if (ocrStatus === 'failed' && data.ocr_error) {
+                                modalOcrError.textContent = data.ocr_error;
+                                modalOcrError.classList.remove('d-none');
+                            }
+                        }
+                        
+                        // Set up modal OCR button event handler (only once)
+                        if (!modalApplyOcrButton.hasOcrEventListener) {
+                            modalApplyOcrButton.addEventListener('click', () => requestOcrProcessing(documentId, 'modal'));
+                            modalApplyOcrButton.hasOcrEventListener = true;
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking document text quality:', error);
+                // Don't show an alert since this is a secondary feature
+            });
+    }
+    
+    /**
+     * Request OCR processing for a document
+     * @param {number} documentId - The document ID
+     * @param {string} source - Either 'document' or 'modal' to identify which UI to update
+     */
+    function requestOcrProcessing(documentId, source = 'document') {
+        // Get the relevant UI elements based on source
+        const ocrStatusBadge = document.getElementById(source === 'document' ? 'documentOcrStatusBadge' : 'ocrStatusBadge');
+        const ocrError = document.getElementById(source === 'document' ? 'documentOcrError' : 'ocrError');
+        const ocrSuccess = document.getElementById(source === 'document' ? 'documentOcrSuccess' : 'ocrSuccess');
+        const ocrProgress = document.getElementById(source === 'document' ? 'documentOcrProgress' : 'ocrProgress');
+        const applyOcrButton = document.getElementById(source === 'document' ? 'documentApplyOcrButton' : 'applyOcrButton');
+        
+        // Update UI to show processing state
+        applyOcrButton.disabled = true;
+        ocrProgress.classList.remove('d-none');
+        ocrError.classList.add('d-none');
+        ocrSuccess.classList.add('d-none');
+        
+        // Call API to start OCR processing
+        fetch(`/documents/api/documents/${documentId}/ocr`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to start OCR processing');
+            }
+            
+            // If immediate processing, show result
+            if (data.ocr_status === 'completed') {
+                ocrSuccess.classList.remove('d-none');
+                ocrProgress.classList.add('d-none');
+                applyOcrButton.disabled = false;
+                ocrStatusBadge.textContent = 'OCR: Completed';
+                ocrStatusBadge.classList.remove('d-none');
+            } 
+            // If background processing, start polling
+            else if (data.ocr_status === 'processing') {
+                ocrStatusBadge.textContent = 'OCR: Processing';
+                ocrStatusBadge.classList.remove('d-none');
+                // Start polling for status updates
+                pollOcrStatus(documentId, source);
+            }
+        })
+        .catch(error => {
+            console.error('Error requesting OCR processing:', error);
+            ocrError.textContent = error.message;
+            ocrError.classList.remove('d-none');
+            ocrProgress.classList.add('d-none');
+            applyOcrButton.disabled = false;
+        });
+    }
+    
+    /**
+     * Poll OCR status until complete or failed
+     * @param {number} documentId - The document ID
+     * @param {string} source - Either 'document' or 'modal' to identify which UI to update
+     */
+    function pollOcrStatus(documentId, source = 'document') {
+        // Get the relevant UI elements based on source
+        const ocrStatusBadge = document.getElementById(source === 'document' ? 'documentOcrStatusBadge' : 'ocrStatusBadge');
+        const ocrError = document.getElementById(source === 'document' ? 'documentOcrError' : 'ocrError');
+        const ocrSuccess = document.getElementById(source === 'document' ? 'documentOcrSuccess' : 'ocrSuccess');
+        const ocrProgress = document.getElementById(source === 'document' ? 'documentOcrProgress' : 'ocrProgress');
+        const applyOcrButton = document.getElementById(source === 'document' ? 'documentApplyOcrButton' : 'applyOcrButton');
+        
+        const statusCheck = setInterval(() => {
+            fetch(`/documents/api/documents/${documentId}/ocr/status`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to get OCR status');
+                    }
+                    
+                    const status = data.ocr_status;
+                    
+                    // Update status badge
+                    ocrStatusBadge.textContent = `OCR: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+                    
+                    // Process is complete or failed
+                    if (status === 'completed' || status === 'failed') {
+                        clearInterval(statusCheck);
+                        ocrProgress.classList.add('d-none');
+                        applyOcrButton.disabled = false;
+                        
+                        if (status === 'completed') {
+                            ocrSuccess.classList.remove('d-none');
+                            // Reload document details to show updated text
+                            showDocumentDetails(documentId);
+                        } else if (status === 'failed') {
+                            ocrError.textContent = data.ocr_error || 'OCR processing failed';
+                            ocrError.classList.remove('d-none');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking OCR status:', error);
+                    clearInterval(statusCheck);
+                    ocrError.textContent = error.message;
+                    ocrError.classList.remove('d-none');
+                    ocrProgress.classList.add('d-none');
+                    applyOcrButton.disabled = false;
+                });
+        }, 3000); // Check every 3 seconds
+    }

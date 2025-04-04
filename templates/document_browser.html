@@ -178,6 +178,48 @@
                         <p class="text-muted">Select a document to view details</p>
                     </div>
                 </div>
+                <div class="mb-3 border-top pt-3 d-none" id="documentOcrSection">
+                    <h5>Document Text Extraction</h5>
+                    <div class="alert alert-warning" id="documentLimitedTextAlert">
+                        <strong>Limited Text Content Detected</strong>
+                        <p>This document appears to have limited or no text content that could be extracted. This may happen with scanned PDFs or documents with embedded images.</p>
+                        <p>You can apply OCR (Optical Character Recognition) processing to attempt to extract text from the document images.</p>
+                    </div>
+                    <div id="documentOcrStatus" class="mb-2">
+                        <span class="badge bg-secondary">Text Quality: <span id="documentTextQualityBadge">Unknown</span></span>
+                        <span class="badge bg-info d-none" id="documentOcrStatusBadge">OCR: Not Processed</span>
+                    </div>
+                    <button type="button" class="btn btn-warning" id="documentApplyOcrButton">
+                        <i class="fas fa-magic"></i> Apply OCR Processing
+                    </button>
+                    <div class="progress d-none mt-2" id="documentOcrProgress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                    <div class="alert alert-danger d-none mt-2" id="documentOcrError"></div>
+                    <div class="alert alert-success d-none mt-2" id="documentOcrSuccess">OCR processing completed successfully</div>
+                </div>
+
+                
+                <div class="mb-3 border-top pt-3 d-none" id="documentOcrSection">
+                    <h5>Document Text Extraction</h5>
+                    <div class="alert alert-warning" id="documentLimitedTextAlert">
+                        <strong>Limited Text Content Detected</strong>
+                        <p>This document appears to have limited or no text content that could be extracted. This may happen with scanned PDFs or documents with embedded images.</p>
+                        <p>You can apply OCR (Optical Character Recognition) processing to attempt to extract text from the document images.</p>
+                    </div>
+                    <div id="documentOcrStatus" class="mb-2">
+                        <span class="badge bg-secondary">Text Quality: <span id="documentTextQualityBadge">Unknown</span></span>
+                        <span class="badge bg-info d-none" id="documentOcrStatusBadge">OCR: Not Processed</span>
+                    </div>
+                    <button type="button" class="btn btn-warning" id="documentApplyOcrButton">
+                        <i class="fas fa-magic"></i> Apply OCR Processing
+                    </button>
+                    <div class="progress d-none mt-2" id="documentOcrProgress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                    <div class="alert alert-danger d-none mt-2" id="documentOcrError"></div>
+                    <div class="alert alert-success d-none mt-2" id="documentOcrSuccess">OCR processing completed successfully</div>
+                </div>
                 
                 <div class="action-buttons mt-3 d-none">
                     <div class="d-flex justify-content-end gap-2">
@@ -261,26 +303,6 @@
                 <h5>Document Text Extraction</h5>
                 <div class="alert alert-warning" id="limitedTextAlert">
                     <strong>Limited Text Content Detected</strong>
-            <div class="mb-3 border-top pt-3 d-none" id="ocrSection">
-                <h5>Document Text Extraction</h5>
-                <div class="alert alert-warning" id="limitedTextAlert">
-                    <strong>Limited Text Content Detected</strong>
-                    <p>This document appears to have limited or no text content that could be extracted. This may happen with scanned PDFs or documents with embedded images.</p>
-                    <p>You can apply OCR (Optical Character Recognition) processing to attempt to extract text from the document images.</p>
-                </div>
-                <div id="ocrStatus" class="mb-2">
-                    <span class="badge bg-secondary">Text Quality: <span id="textQualityBadge">Unknown</span></span>
-                    <span class="badge bg-info d-none" id="ocrStatusBadge">OCR: Not Processed</span>
-                </div>
-                <button type="button" class="btn btn-warning" id="applyOcrButton">
-                    <i class="bi bi-magic"></i> Apply OCR Processing
-                </button>
-                <div class="progress d-none mt-2" id="ocrProgress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
-                </div>
-                <div class="alert alert-danger d-none mt-2" id="ocrError"></div>
-                <div class="alert alert-success d-none mt-2" id="ocrSuccess">OCR processing completed successfully</div>
-            </div>
                     <p>This document appears to have limited or no text content that could be extracted. This may happen with scanned PDFs or documents with embedded images.</p>
                     <p>You can apply OCR (Optical Character Recognition) processing to attempt to extract text from the document images.</p>
                 </div>
