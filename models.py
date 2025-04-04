@@ -51,12 +51,8 @@ class Document(db.Model):
     # Added collection_id foreign key
     collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=True)
     
-    # OCR-related fields
+    # Text quality field (for future use)
     text_extraction_quality = db.Column(db.String(20), default='unknown')  # 'good', 'limited', 'none'
-    ocr_status = db.Column(db.String(20))  # 'pending', 'processing', 'completed', 'failed', None
-    ocr_requested_at = db.Column(db.DateTime)
-    ocr_completed_at = db.Column(db.DateTime)
-    ocr_error = db.Column(db.Text)
     
     def __repr__(self):
         return f"<Document {self.id}: {self.title}>"
