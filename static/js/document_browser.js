@@ -1823,12 +1823,6 @@ function checkDocumentTextQuality(documentId) {
                 ocrStatusBadge.classList.remove('d-none');
             } 
             // If background processing, start polling
-            else if (data.ocr_status === 'processing') {
-                ocrStatusBadge.textContent = 'OCR: Processing';
-                ocrStatusBadge.classList.remove('d-none');
-                // Start polling for status updates
-                pollOcrStatus(documentId, source);
-            }
         })
         .catch(error => {
             console.error('Error requesting OCR processing:', error);
@@ -1837,12 +1831,6 @@ function checkDocumentTextQuality(documentId) {
             ocrProgress.classList.add('d-none');
             applyOcrButton.disabled = false;
         });
-            else if (data.ocr_status === 'processing') {
-                ocrStatusBadge.textContent = 'OCR: Processing';
-                ocrStatusBadge.classList.remove('d-none');
-                // Start polling for status updates
-                pollOcrStatus(documentId, source);
-            }
         })
         .catch(error => {
             console.error('Error requesting OCR processing:', error);
