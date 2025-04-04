@@ -63,10 +63,9 @@
 }
 
 .document-list {
-    height: 700px;
     max-height: calc(100vh - 350px);
-    min-height: 600px;
     overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Make document details scrollable */
