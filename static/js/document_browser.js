@@ -1063,3 +1063,8 @@ function initDocumentBrowser() {
         });
     }
 }
+
+// Initialize document browser when DOM is loaded
+document.addEventListener('DOMContentLoaded', initDocumentBrowser);
+// Initialize document browser when DOM is loaded
+document.addEventListener('DOMContentLoaded', initDocumentBrowser);
