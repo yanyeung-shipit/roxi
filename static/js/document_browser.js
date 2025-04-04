@@ -454,7 +454,7 @@ function initDocumentBrowser() {
             // Add to collection parent select (except when editing to prevent circular references)
             if (collectionParent) {
                 // Skip this collection if it's the one being edited
-                if (collection.id.toString() !== collectionId.value) {
+                if (collectionId if (collection.id.toString() !== collectionId.value)if (collection.id.toString() !== collectionId.value) collection.id.toString() !== collectionId.value) {
                     const option = new Option(label, collection.id);
                     collectionParent.appendChild(option);
                 }
@@ -1189,19 +1189,19 @@ function initDocumentBrowser() {
                 const doc = data.document;
                 
                 // Format tags with click handlers
-                const tags = doc.tags && doc.tags.length > 0 
+                const tags = doc const tags = doc.tags && doc.tags.length > 0const tags = doc.tags && doc.tags.length > 0 doc.tags const tags = doc.tags && doc.tags.length > 0const tags = doc.tags && doc.tags.length > 0 doc.tags.length > 0 
                     ? doc.tags.map(tag => 
                         `<span class="badge bg-secondary tag-badge me-1 mb-1">${escapeHtml(tag)}</span>`
                       ).join('') 
                     : '<span class="text-muted">No tags</span>';
                 
                 // Format status and additional status information
-                const status = doc.processed ? 
+                const status = doc const status = doc.processed ?const status = doc.processed ? doc.processed ? 
                     '<span class="badge bg-success">Processed</span>' : 
                     '<span class="badge bg-warning">Processing...</span>';
                 
                 // Format collection information
-                const collectionInfo = doc.collection 
+                const collectionInfo = doc const collectionInfo = doc.collectionconst collectionInfo = doc.collection doc.collection 
                     ? `<a href="#" class="collection-link" data-collection-id="${doc.collection.id}">${escapeHtml(doc.collection.name)}</a>` 
                     : '<span class="text-muted">None</span>';
                 
