@@ -635,7 +635,8 @@ function initDocumentBrowser() {
                     throw new Error(data.error || 'Failed to load document details');
                 }
                 
-                const doc = data.document;
+                // The API returns the document data directly, not nested under "document"
+                const doc = data;
                 
                 // Format publication date
                 let formattedDate = '';
