@@ -28,6 +28,7 @@ function initDocumentBrowser() {
     const selectedCount = document.getElementById('selectedCount');
     const batchMoveBtn = document.getElementById('batchMoveBtn');
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    const confirmBatchDeleteButton = document.getElementById('confirmBatchDeleteButton');
     
     // Modals with null checks
     const editDocumentModal = document.getElementById('editDocumentModal') ? 
@@ -38,7 +39,10 @@ function initDocumentBrowser() {
         new bootstrap.Modal(document.getElementById('manageCollectionsModal')) : null;
     const deleteConfirmModal = document.getElementById('deleteConfirmModal') ?
         new bootstrap.Modal(document.getElementById('deleteConfirmModal')) : null;
+    const batchDeleteModal = document.getElementById('batchDeleteModal') ?
+        new bootstrap.Modal(document.getElementById('batchDeleteModal')) : null;
     const batchMoveModal = document.getElementById('batchMoveModal') ?
+        new bootstrap.Modal(document.getElementById('batchMoveModal')) : null;
         new bootstrap.Modal(document.getElementById('batchMoveModal')) : null;
     
     // Modal elements
@@ -135,19 +139,37 @@ function initDocumentBrowser() {
             }
         });
     }
-    
     // Handle batch delete button
     if (batchDeleteBtn) {
-        batchDeleteBtn.addEventListener('click', function() {
+        batchDeleteBtn.addEventListener("click", function() {
+            if (selectedDocuments.size === 0) return;
+            
+            // Set up batch delete modal
+            if (document.getElementById("batchDeleteCount")) {
+                document.getElementById("batchDeleteCount").textContent = selectedDocuments.size;
+            }
+            
+            // Show batch delete modal
+            if (batchDeleteModal) {
+                batchDeleteModal.show();
+            }
+        });
+    }
+        });
+    }
             if (selectedDocuments.size === 0) return;
             
             // Set up confirmation modal
-            deleteType = 'batch';
-            if (deleteConfirmMessage) {
-                deleteConfirmMessage.textContent = `Are you sure you want to delete ${selectedDocuments.size} selected document(s)? This action cannot be undone.`;
+
+            // Set up batch delete modal
+            if (document.getElementById("batchDeleteCount")) {
+                document.getElementById("batchDeleteCount").textContent = selectedDocuments.size;
             }
-            if (deleteConfirmModal) {
-                deleteConfirmModal.show();
+            
+            // Show batch delete modal
+            if (batchDeleteModal) {
+                batchDeleteModal.show();
+            }
             }
         });
     }
