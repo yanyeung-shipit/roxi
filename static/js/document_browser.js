@@ -1011,6 +1011,14 @@ function initDocumentBrowser() {
                 <div class="document-date">${formattedDate}</div>
                 ${tagsHtml}
                 ${collectionHtml}
+                <div class="document-actions mt-2">
+                    <button class="btn btn-sm btn-outline-secondary edit-doc-btn" data-id="${doc.id}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger delete-doc-btn" data-id="${doc.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             `;
             
             // Add click handler
@@ -1041,6 +1049,49 @@ function initDocumentBrowser() {
         if (isMultiSelectMode) {
             toggleMultiSelectMode();
         }
+        
+        // Add event listeners to document card action buttons
+        const editDocBtns = document.querySelectorAll('.edit-doc-btn');
+        const deleteDocBtns = document.querySelectorAll('.delete-doc-btn');
+        
+        // Add click handlers for edit buttons
+        editDocBtns.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent triggering the card click event
+                const docId = this.dataset.id;
+                // Find the document and display it in detail view
+                const doc = documents.find(d => d.id === docId);
+                if (doc) {
+                    currentDocumentId = docId;
+                    displayDocumentDetails(doc);
+                    
+                    // Trigger edit modal
+                    if (editDocumentButton) {
+                        editDocumentButton.click();
+                    }
+                }
+            });
+        });
+        
+        // Add click handlers for delete buttons
+        deleteDocBtns.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent triggering the card click event
+                const docId = this.dataset.id;
+                
+                // Set up confirmation modal
+                deleteType = 'document';
+                deleteId = docId;
+                if (deleteConfirmMessage) {
+                    deleteConfirmMessage.textContent = 'Are you sure you want to delete this document? This action cannot be undone.';
+                }
+                
+                // Show confirmation modal
+                if (deleteConfirmModal) {
+                    deleteConfirmModal.show();
+                }
+            });
+        });
     }
     
     /**
