@@ -11,6 +11,9 @@ ROXI is an intelligent scientific document processing platform leveraging Retrie
 - Automatic citation generation in APA format
 - Vector search for intelligent query processing
 - Interactive conversation interface
+- Clean, minimalist search interface
+- Tag-based document categorization with rheumatology-specific taxonomies
+- Multi-select operations for document management
 
 ## Technology Stack
 
@@ -50,10 +53,20 @@ The following environment variables are required:
 3. Ask research questions through the main query interface
 4. View document details, edit metadata, and manage tags
 
+## Recent Updates
+
+- Improved document browser interface with bold document titles
+- Author name truncation for better readability
+- Enhanced tag generation specific to rheumatology domain
+- Collection management with hierarchical structure
+- Multi-select functionality for bulk document operations
+- Integration with PubMed for enhanced metadata
+
 ## License
 
-[Specify your license here]
+MIT License
 
 ## Acknowledgments
 
-[Any acknowledgments you'd like to include]
+- PubMed Central for access to research metadata
+- DOI.org for DOI validation services
