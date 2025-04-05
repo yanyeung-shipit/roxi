@@ -917,7 +917,7 @@ def update_document_collection(document_id):
             'error': f"Failed to update document collection: {str(e)}"
         }), 500
 
-@document_routes.route('/api/documents/<int:document_id>/pdf', methods=['GET'])
+@document_routes.route('view/<int:document_id>', methods=['GET'])
 def view_document_pdf(document_id):
     """
     Serve the PDF file of a document for viewing
@@ -940,6 +940,9 @@ def view_document_pdf(document_id):
                 'success': False,
                 'error': 'PDF file not found'
             }), 404
+        
+        # Log the file path for debugging
+        logging.info(f"Sending PDF file: {os.path.join(upload_folder, document.filename)}")
         
         # Send the file
         return send_from_directory(upload_folder, document.filename, as_attachment=False)
