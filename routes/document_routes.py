@@ -922,6 +922,8 @@ def view_document_pdf(document_id):
     """
     Serve the PDF file of a document for viewing
     """
+    import logging  # Import at the beginning of the function to avoid UnboundLocalError
+    
     try:
         document = Document.query.get(document_id)
         
@@ -947,7 +949,6 @@ def view_document_pdf(document_id):
         # Send the file
         return send_from_directory(upload_folder, document.filename, as_attachment=False)
     except Exception as e:
-        import logging
         logging.exception(f"Error viewing PDF: {str(e)}")
         return jsonify({
             'success': False,
