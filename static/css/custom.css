@@ -19,12 +19,14 @@
 
 /* Document cards */
 .document-card {
+    font-size: 14px; /* Decreased from default (16px) by 2 points */
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
     margin-bottom: 8px !important;
     height: auto;
     min-height: 25px;
+    font-size: 14px; /* Decreased from default (16px) by 2 points */
 }
 
 .document-card .card-body {
