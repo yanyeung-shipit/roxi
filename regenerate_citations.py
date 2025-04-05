@@ -81,15 +81,8 @@ def regenerate_all_citations(force=True):
                 # Always regenerate the citation
                 new_citation = generate_citation(doc)
                 
-                # Print document metadata
-                logger.info(f"Document {doc_id}:")
-                logger.info(f"  Title: {doc.title}")
-                logger.info(f"  Authors: {doc.authors}")
-                logger.info(f"  Journal: {doc.journal}")
-                logger.info(f"  Date: {doc.publication_date}")
-                logger.info(f"  DOI: {doc.doi}")
-                logger.info(f"  Old citation: {old_citation}")
-                logger.info(f"  New citation: {new_citation}")
+                # Print only document ID and status for a more compact log
+                logger.info(f"Document {doc_id}: Processing...")
                 
                 if force or not old_citation or old_citation.strip() == "" or old_citation == "Citation not available":
                     doc.citation_apa = new_citation
