@@ -308,9 +308,9 @@ function initDocumentBrowser() {
     if (confirmDeleteButton) {
         confirmDeleteButton.addEventListener('click', function() {
             if (deleteType === 'document' && deleteId) {
-                deleteDocument(deleteId);
+                deleteDocument(parseInt(deleteId));
             } else if (deleteType === 'collection' && deleteId) {
-                deleteCollection(deleteId);
+                deleteCollection(parseInt(deleteId));
             } else if (deleteType === 'batch') {
                 batchDeleteDocuments();
             }
@@ -328,7 +328,7 @@ function initDocumentBrowser() {
             if (!currentDocumentId) return;
             
             // Find current document
-            const doc = documents.find(d => d.id === currentDocumentId);
+            const doc = documents.find(d => d.id === parseInt(currentDocumentId));
             if (!doc) return;
             
             // Populate form
@@ -1060,7 +1060,7 @@ function initDocumentBrowser() {
                 e.stopPropagation(); // Prevent triggering the card click event
                 const docId = this.dataset.id;
                 // Find the document and display it in detail view
-                const doc = documents.find(d => d.id === docId);
+                const doc = documents.find(d => d.id === parseInt(docId));
                 if (doc) {
                     currentDocumentId = docId;
                     displayDocumentDetails(doc);
