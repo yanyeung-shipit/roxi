@@ -214,52 +214,29 @@ def update_system_metrics_task():
         return False
 
 def generate_tags_from_content(text):
-    """Generate tags from document content using NLP techniques"""
-    # This is a placeholder for demo purposes
-    # In a real system, you would use NLP to extract keywords
+    """
+    Generate tags from document content by using the centralized tag matching function
+    from document_processor module, ensuring consistency across the application.
     
-    # Some common academic fields
-    fields = [
-        "Artificial Intelligence", "Machine Learning", "Deep Learning", 
-        "Computer Vision", "Natural Language Processing", "Robotics",
-        "Biology", "Chemistry", "Physics", "Mathematics", "Statistics",
-        "Medicine", "Psychology", "Neuroscience", "Genetics", "Climate Science",
-        "Economics", "Finance", "Political Science", "Sociology"
-    ]
+    Args:
+        text (str): The text to generate tags from
+        
+    Returns:
+        list: List of standardized tags from our predefined lists
+    """
+    # Import the centralized tag matching function
+    from utils.document_processor import match_to_predefined_tags
     
-    # Sample common technical terms
-    techniques = [
-        "Neural Networks", "Reinforcement Learning", "Supervised Learning",
-        "Unsupervised Learning", "Classification", "Regression", "Clustering",
-        "Optimization", "Algorithms", "Data Analysis", "Simulation",
-        "Statistical Analysis", "Quantum Computing", "Graph Theory",
-        "Network Analysis", "Meta-Analysis", "Review", "Survey"
-    ]
+    # Use our standardized tag matching function
+    tags = match_to_predefined_tags(text_content=text)
     
-    # Convert text to lowercase for matching
-    text_lower = text.lower()
+    # The match_to_predefined_tags function already:
+    # 1. Matches text against our standard disease/document type dictionaries
+    # 2. Scores and sorts tags by relevance
+    # 3. Limits to 6 tags maximum
     
-    # Find matches
-    tags = []
-    
-    # Check each field
-    for field in fields:
-        if field.lower() in text_lower:
-            tags.append(field)
-    
-    # Check each technique
-    for technique in techniques:
-        if technique.lower() in text_lower:
-            tags.append(technique)
-    
-    # Limit to 5 tags maximum
-    if len(tags) > 5:
-        # Randomize which tags we keep
-        random.shuffle(tags)
-        tags = tags[:5]
-    
-    # If no tags were found, add some general ones
+    # If no tags were found, add some general ones for rheumatology
     if not tags:
-        tags = ["Research Paper", "Academic"]
+        tags = ["Rheumatology", "Research Paper"]
     
     return tags

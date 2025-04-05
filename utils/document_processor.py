@@ -20,6 +20,172 @@ from utils.pubmed_integration import (
     generate_tags_from_pubmed
 )
 
+# Set up logging
+logger = logging.getLogger(__name__)
+
+def match_to_predefined_tags(text_content, tag_candidates=None):
+    """
+    Match text content or candidate tags to the predefined list of valid tags.
+    This ensures that only approved, standardized tags are used.
+    
+    Args:
+        text_content (str): The text content to analyze for tag matches
+        tag_candidates (list, optional): List of potential tag candidates to filter
+        
+    Returns:
+        list: List of matched predefined tags
+    """
+    # Define dictionaries needed for tag generation and classification
+    # Common rheumatology disease categories
+    diseases = {
+        "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-", "rheumatoid", "arthritis, rheumatoid"],
+        "Polymyalgia Rheumatica": ["polymyalgia rheumatica", "pmr ", "pmr,", "pmr.", "pmr)"],
+        "Systemic Lupus Erythematosus": ["systemic lupus", "sle ", "sle,", "sle.", "sle)", "lupus nephritis", "lupus erythematosus"],
+        "Cutaneous lupus": ["discoid lupus", "lupus profundus", "lupus panniculitis", "tumid lupus", "urticarial lupus"],
+        "Systemic Sclerosis": ["systemic sclerosis", "scleroderma", "ssc", "crest syndrome"],
+        "Myositis": ["iim", "idiopathic inflammatory myopathy", "dermatomyositis", "polymyositis"],
+        "Sjögren's": ["sjögren", "sjogren", "sicca syndrome", "sjögren's syndrome", "sjogren's disease", "sjögren's disease"],
+        "Spondyloarthropathy": ["axial spondyloarthritis", "psoriatic arthritis", "reactive arthritis", "enteropathic arthritis"],
+        "Axial Spondyloarthritis": ["ankylosing spondylitis", "non-radiographic axial spondyloarthritis", "axspa", "nr-axspa"],
+        "Psoriatic Arthritis": ["psoriatic arthritis", "psa ", "psa,", "psa.", "psa)"],
+        "Reactive Arthritis": ["rea", "post-infectious arthritis", "gonococcal arthritis", "reiter's syndrome", "reiter"],
+        "Enteropathic Arthritis": ["ibd-arthritis", "ibd", "inflammatory bowel disease", "crohn's", "ulcerative colitis"],
+        "Vasculitis": ["vasculitis", "anca", "giant cell arteritis", "takayasu", "polyarteritis"],
+        "GCA": ["giant cell arteritis", "temporal arteritis"],
+        "Takayasu": ["tak", "takayasu"],
+        "Polyarteritis Nodosa": ["pan", "arteritis"],
+        "GPA": ["granulomatosis with polyangiitis", "wegener's", "anca", "aav"],
+        "MPA": ["microscopic polyangiitis", "anca", "aav"],
+        "EGPA": ["eosinophilic granulomatosis and polyangiitis", "churg-strauss"],
+        "Immune-Complex Vasculitis": ["immune-complex mediated vasculitis"],
+        "IgA Vasculitis": ["iga vasculitis"],
+        "Urticarial Vasculitis": ["urticarial vasculitis"],
+        "Anti-GBM": ["anti-glomerular basement membrane disease", "anti-gbm disease", "goodpasture disease"],
+        "Osteoarthritis": ["osteoarthritis", "oa ", "oa,", "oa.", "oa)", "degenerative joint disease"],
+        "Cryo": ["cryoglobulinemic vasculitis", "mixed cryoglobulinemia syndrome", "cryoglobulinemia"],
+        "Behcet's": ["behçet's"],
+        "Gout": ["gout", "gouty arthritis"],
+        "CPPD": ["calcium pyrophosphate deposition disease", "pseudogout", "crowned dens"],
+        "PCNSV": ["primary cns vasculitis", "primary angiitis of the cns", "pacns"],
+        "Still's Disease": ["adult-onset still's disease", "stills disease", "systemic jia", "aosd"],
+        "Sarcoidosis": ["sarcoid"],
+        "IgG4-RD": ["igg4-related disease", "mikulicz", "riedel's thyroiditis"],
+        "Relapsing Polychondritis": ["rpc", "polychondritis", "vexas"],
+        "Fibromyalgia": ["fibromyalgia", "fibromyalgia syndrome", "fms ", "fms,", "fms.", "fms)"],
+        "ILD": ["interstitial lung disease", "ild ", "ild,", "ild.", "ild)", "pulmonary fibrosis", "ipf", "nsip", "uip", "fibrotic lung disease"]
+    }
+    
+    # Document types
+    document_types = {
+        "Guideline": ["guideline", "guidelines", "recommendation", "consensus", "eular", "acr criteria", "practice guidelines"],
+        "Clinical Trial": ["clinical trial", "phase iii", "phase 3", "randomized", "randomised", "rct ", "rct,", "rct.", "randomized controlled trial"],
+        "Meta-Analysis": ["meta-analysis", "meta analysis", "systematic review"],
+        "Cohort Study": ["cohort study", "longitudinal study", "observational study", "prospective studies", "retrospective studies"],
+        "Case Report": ["case report", "case series"],
+        "Review": ["review", "literature review", "primer"],
+        "Cross-Sectional Study": ["cross-sectional study"],
+        "Case-Control Study": ["case-control study"],
+        "Registries": ["registries"],
+        "Real-World Evidence": ["real-world evidence"],
+        "Epidemiology": ["epidemiology"],
+        "Incidence": ["incidence"],
+        "Prevalence": ["prevalence"],
+        "Disease Burden": ["disease burden"],
+        "Risk Factors": ["risk factors"],
+        "Comorbidity": ["comorbidity"],
+        "Population Surveillance": ["population surveillance"],
+        "Health Services Research": ["health services research"],
+        "Outcomes Research": ["outcomes research"]
+    }
+    
+    # Store all predefined tag keys
+    all_tag_keys = list(diseases.keys()) + list(document_types.keys())
+    
+    # Initialize result tags and tag scores
+    matched_tags = []
+    tag_scores = {}
+    
+    # If tag candidates are provided, check if any match our predefined tags
+    if tag_candidates and isinstance(tag_candidates, list):
+        for candidate in tag_candidates:
+            # Direct match (case insensitive)
+            candidate_lower = candidate.lower()
+            
+            # Check for direct match with keys
+            for tag in all_tag_keys:
+                if tag.lower() == candidate_lower:
+                    if tag not in matched_tags:
+                        matched_tags.append(tag)
+                        # High score for exact match
+                        tag_scores[tag] = 100
+                        break
+            
+            # If no direct match, check for partial matches
+            if not any(tag.lower() == candidate_lower for tag in all_tag_keys):
+                # Check disease categories
+                for disease, keywords in diseases.items():
+                    for keyword in keywords:
+                        if keyword.lower() in candidate_lower:
+                            if disease not in matched_tags:
+                                matched_tags.append(disease)
+                                # Score based on how much of the term matched
+                                tag_scores[disease] = tag_scores.get(disease, 0) + 5
+                            break
+                
+                # Check document types
+                for doc_type, keywords in document_types.items():
+                    for keyword in keywords:
+                        if keyword.lower() in candidate_lower:
+                            if doc_type not in matched_tags:
+                                matched_tags.append(doc_type)
+                                # Score based on how much of the term matched
+                                tag_scores[doc_type] = tag_scores.get(doc_type, 0) + 5
+                            break
+    
+    # If text content is provided, search for mentions of predefined tags
+    if text_content and isinstance(text_content, str):
+        text_lower = text_content.lower()
+        
+        # Search for disease terms
+        for disease, keywords in diseases.items():
+            # Initialize score for this disease
+            current_score = 0
+            
+            for term in keywords:
+                # Count occurrences of the term
+                count = text_lower.count(term.lower())
+                if count > 0:
+                    # Add to the score
+                    current_score += count * 2
+            
+            # Only add if mentioned significantly
+            if current_score >= 5 and disease not in matched_tags:
+                matched_tags.append(disease)
+                tag_scores[disease] = current_score
+        
+        # Search for document type terms
+        for doc_type, keywords in document_types.items():
+            # Initialize score for this document type
+            current_score = 0
+            
+            for term in keywords:
+                # Count occurrences
+                count = text_lower.count(term.lower())
+                if count > 0:
+                    # Add to the score
+                    current_score += count * 2
+            
+            # Only add if mentioned significantly
+            if current_score >= 5 and doc_type not in matched_tags:
+                matched_tags.append(doc_type)
+                tag_scores[doc_type] = current_score
+    
+    # Sort tags by score (most relevant first)
+    sorted_tags = sorted(matched_tags, key=lambda tag: tag_scores.get(tag, 0), reverse=True)
+    
+    # Return the most relevant tags (limit to 6)
+    return sorted_tags[:6]
+
 logger = logging.getLogger(__name__)
 
 # Global queue for document processing
@@ -412,318 +578,131 @@ def generate_tags_from_content(text, document=None, metadata=None):
         metadata (dict, optional): Metadata from Crossref/PubMed
         
     Returns:
-        list: Generated tags 
+        list: Generated tags that match our predefined tag list
     """
     import re  # Explicitly import re to avoid LSP errors
     
-    tags = []
+    # Initialize list to store tag candidates before filtering
+    tag_candidates = []
     
     # STRATEGY 1: Use metadata from Crossref/PubMed if available
     if metadata:
         # Get keywords from Crossref (if available)
         if 'subject' in metadata and isinstance(metadata['subject'], list):
             # Crossref subjects are often in the form of keywords
-            for subject in metadata['subject'][:5]:  # Limit to 5 subjects
+            for subject in metadata['subject']:
                 if isinstance(subject, str) and len(subject) < 50:  # Avoid extremely long subjects
-                    tags.append(subject)
+                    tag_candidates.append(subject)
         
         # Some Crossref entries have explicit keywords
         if 'keyword' in metadata and isinstance(metadata['keyword'], list):
-            for keyword in metadata['keyword'][:5]:  # Limit to 5 keywords
+            for keyword in metadata['keyword']:
                 if isinstance(keyword, str) and len(keyword) < 50:
-                    tags.append(keyword)
+                    tag_candidates.append(keyword)
     
     # STRATEGY 2: Look for explicit keyword sections in the text
-    if not tags:
-        # Common patterns for keyword sections
-        keyword_patterns = [
-            # Standard format with space after period
-            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\.\s|\.$)',
-            # Format with periods directly followed by next keyword (common in some journals)
-            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\n)',
-            # Additional pattern for keywords with period separator (like "word1.word2.word3")
-            r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([A-Za-z0-9\s\-.]{5,200}?)(?:\n\n|\n)',
-            # MeSH terms format
-            r'(?:MeSH terms?|index terms?|subject headings?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\.\s|\.$)'
-        ]
-        
-        for pattern in keyword_patterns:
-            keyword_match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
-            if keyword_match:
-                keyword_text = keyword_match.group(1).strip()
-                # Keywords are usually separated by commas, semicolons, or periods
-                if ',' in keyword_text:
-                    keyword_list = [k.strip() for k in keyword_text.split(',')]
-                elif ';' in keyword_text:
-                    keyword_list = [k.strip() for k in keyword_text.split(';')]
-                elif '.' in keyword_text and keyword_text.count('.') > 1:
-                    # To handle the pattern in "Keywords Rheumatoid vasculitis .Clinical features .Pathogenesis .Investigations .Treatment .Extra-articular manifestations"
-                    # We need a different approach as the periods are adjacent to words
-                    
-                    # Check for the specific pattern of ".Word" (period immediately followed by uppercase letter)
-                    if re.search(r'\.[A-Z]', keyword_text):
-                        # This is the format from the rheumatoid vasculitis paper
-                        # First, extract the first keyword before any period
-                        first_match = re.match(r'^([^.]+)', keyword_text)
-                        keywords = []
-                        if first_match:
-                            # Extract the first keyword, before any period
-                            first_keyword = first_match.group(1).strip()
-                            if first_keyword and len(first_keyword) > 2:  # Only add if it's meaningful
-                                keywords.append(first_keyword)
-                        
-                        # Then extract all keywords that start with period + capital letter
-                        # But treat each as a separate keyword (don't keep the period)
-                        period_keywords = re.findall(r'\.([A-Z][^.]+)(?=\.|$)', keyword_text)
-                        for kw in period_keywords:
-                            kw = kw.strip()
-                            if kw and len(kw) > 2:  # Only add if it's meaningful
-                                keywords.append(kw)
-                        
-                        keyword_list = keywords
-                    else:
-                        # For other period formats, use our normalized approach
-                        # First, normalize by replacing ". " (period+space) with " | " (space+pipe+space)
-                        normalized = keyword_text.replace('. ', ' | ')
-                        
-                        # Then replace " ." (space+period) with " | " (space+pipe+space)
-                        normalized = normalized.replace(' .', ' | ')
-                        
-                        # Then replace remaining periods with pipe (this would be format 3)
-                        normalized = normalized.replace('.', ' | ')
-                        
-                        # Split by our normalized separator
-                        keyword_list = [k.strip() for k in normalized.split('|') if k.strip()]
-                else:
-                    # If no recognized separators, it might be one keyword or space-separated
-                    keyword_list = [keyword_text]
-                
-                # Add keywords found in the document
-                for keyword in keyword_list[:5]:  # Limit to 5 keywords
-                    if len(keyword) > 2 and len(keyword) < 50:  # Avoid very short or long keywords
-                        tags.append(keyword)
-                
-                # If we found keywords, no need to try other patterns
-                if tags:
-                    break
+    # Common patterns for keyword sections
+    keyword_patterns = [
+        # Standard format with space after period
+        r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\.\s|\.$)',
+        # Format with periods directly followed by next keyword (common in some journals)
+        r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\n)',
+        # Additional pattern for keywords with period separator (like "word1.word2.word3")
+        r'(?:key[\s-]*words?|KEYWORDS?)[\s:]+([A-Za-z0-9\s\-.]{5,200}?)(?:\n\n|\n)',
+        # MeSH terms format
+        r'(?:MeSH terms?|index terms?|subject headings?)[\s:]+([^\n;]{5,200}?)(?:\n\n|\.\s|\.$)'
+    ]
     
-    # STRATEGY 3: Extract important words from title
-    if document and document.title and (len(tags) < 2):
-        title = document.title
+    for pattern in keyword_patterns:
+        keyword_match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        if keyword_match:
+            keyword_text = keyword_match.group(1).strip()
+            # Keywords are usually separated by commas, semicolons, or periods
+            if ',' in keyword_text:
+                keyword_list = [k.strip() for k in keyword_text.split(',')]
+            elif ';' in keyword_text:
+                keyword_list = [k.strip() for k in keyword_text.split(';')]
+            elif '.' in keyword_text and keyword_text.count('.') > 1:
+                # To handle period-separated keywords which need special processing
+                if re.search(r'\.[A-Z]', keyword_text):
+                    # Handle the format from the rheumatoid vasculitis paper
+                    # First, extract the first keyword before any period
+                    first_match = re.match(r'^([^.]+)', keyword_text)
+                    keywords = []
+                    if first_match:
+                        # Extract the first keyword, before any period
+                        first_keyword = first_match.group(1).strip()
+                        if first_keyword and len(first_keyword) > 2:
+                            keywords.append(first_keyword)
+                    
+                    # Then extract all keywords that start with period + capital letter
+                    period_keywords = re.findall(r'\.([A-Z][^.]+)(?=\.|$)', keyword_text)
+                    for kw in period_keywords:
+                        kw = kw.strip()
+                        if kw and len(kw) > 2:
+                            keywords.append(kw)
+                    
+                    keyword_list = keywords
+                else:
+                    # For other period formats, normalize first
+                    normalized = keyword_text.replace('. ', ' | ').replace(' .', ' | ').replace('.', ' | ')
+                    keyword_list = [k.strip() for k in normalized.split('|') if k.strip()]
+            else:
+                # If no recognized separators, it might be one keyword or space-separated
+                keyword_list = [keyword_text]
+            
+            # Add keywords found in the document
+            for keyword in keyword_list:
+                if len(keyword) > 2 and len(keyword) < 50:  # Avoid very short or long keywords
+                    tag_candidates.append(keyword)
+            
+            # If we found keywords, no need to try other patterns
+            if tag_candidates:
+                break
+    
+    # STRATEGY 3: Extract important terms from title
+    if document and document.title:
+        title = document.title.lower()
+        # Add the entire title as a candidate
+        tag_candidates.append(document.title)
         
-        # Skip common words that aren't helpful as tags
-        common_words = {'the', 'a', 'an', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'to', 'and', 'or', 'from'}
-        
-        # Look for significant noun phrases in title (diseases, study types, etc.)
+        # Add common disease and document type patterns
         important_patterns = [
             # Disease patterns
-            r"(rheumatoid arthritis|systemic lupus|psoriatic arthritis|ankylosing spondylitis|osteoarthritis|gout|systemic sclerosis|vasculitis|sjogren's syndrome|polymyalgia rheumatica|polymyositis|fibromyalgia|interstitial lung disease|myositis|axial spondyloarthritis|reactive arthritis|enteropathic arthritis|giant cell arteritis|takayasu|polyarteritis nodosa|granulomatosis with polyangiitis|microscopic polyangiitis|eosinophilic granulomatosis|behcet's)",
+            r"(rheumatoid arthritis|systemic lupus|psoriatic arthritis|ankylosing spondylitis|osteoarthritis|gout|systemic sclerosis|vasculitis|sjogren's syndrome|polymyalgia rheumatica|polymyositis|fibromyalgia|interstitial lung disease|myositis)",
             # Study type patterns
-            r"(guidelines?|recommendations?|consensus|meta-analysis|systematic review|cohort study|case report|case series|clinical trial|cross-sectional study|case-control study|epidemiology|incidence|prevalence|registries|real-world evidence)"
+            r"(guidelines?|recommendations?|consensus|meta-analysis|systematic review|cohort study|case report|case series|clinical trial|cross-sectional study|case-control study)"
         ]
         
         for pattern in important_patterns:
-            matches = re.finditer(pattern, title.lower())
+            matches = re.finditer(pattern, title)
             for match in matches:
                 tag = match.group(1)
                 # Capitalize first letter of each word to make tags look nicer
                 tag = ' '.join(word.capitalize() for word in tag.split())
-                if tag not in tags:
-                    tags.append(tag)
-        
-        # If we still need more tags, extract significant words from title
-        if len(tags) < 2:
-            # Split title into words and filter out common words
-            title_words = [word.strip('.,;:()[]{}') for word in title.split()]
-            title_words = [word for word in title_words if len(word) > 3 and word.lower() not in common_words]
-            
-            # Add up to 2 significant words from title
-            for word in title_words[:2]:
-                if word and word not in tags:
-                    tags.append(word)
+                tag_candidates.append(tag)
     
-    # Define dictionaries needed for tag generation and classification
-    # Common rheumatology disease categories
-    diseases = {
-        "Rheumatoid Arthritis": ["rheumatoid arthritis", "ra ", "ra,", "ra.", "ra)", "ra-", "rheumatoid", "arthritis, rheumatoid"],
-
-        "Polymyalgia Rheumatica": ["polymyalgia rheumatica", "pmr ", "pmr,", "pmr.", "pmr)"],
-        
-        "Systemic Lupus Erythematosus": ["systemic lupus", "sle ", "sle,", "sle.", "sle)", "lupus nephritis", "lupus erythematosus"],
-        
-        "Cutaneous lupus": ["discoid lupus", "lupus profundus", "lupus panniculitis", "tumid lupus", "Urticarial lupus"],
-
-        "Systemic Sclerosis": ["systemic sclerosis", "scleroderma", "SSC", "CREST syndrome"],
-
-        "Myositis": ["IIM", "Idiopathic inflammatory myopathy", "dermatomyositis", "polymyositis"],
-        
-        "Sjögren's": ["sjögren", "sjogren", "sicca syndrome", "Sjögren's Syndrome", "Sjogren's Disease", "Sjögren's Disease"],
-        
-        "Spondyloarthropathy": ["axial spondyloarthritis", "psoriatic arthritis", "reactive arthritis", "enteropathic arthritis"],
-
-        "axial spondyloarthritis": ["ankylosing spondylitis", "Ankylosing Spondylitis", "non-radiographic axial spondyloarthritis", "AxSpA", "nr-AxSpA"],
-        
-        "Psoriatic Arthritis": ["psoriatic arthritis", "psa ", "psa,", "psa.", "psa)"],
-
-        "Reactive Arthritis": ["ReA", "post-infectious arthritis", "gonococcal arthritis", "Reiter's Syndrome", "Reiter"],
-
-        "Enteropathic arthritis": ["IBD-arthritis", "IBD", "inflammatory bowel disease", "Crohn's", "Ulcerative colitis"],
-
-        "Vasculitis": ["vasculitis", "anca", "giant cell arteritis", "takayasu", "polyarteritis"],
-        
-        "GCA": ["Giant Cell Arteritis", "temporal arteritis"],
-
-        "Takayasu": ["TAK", "Takayasu"],
-
-        "Polyarteritis Nodosa": ["PAN", "arteritis"],
-
-        "GPA": ["Granulomatosis with Polyangiitis", "Wegener's", "ANCA", "AAV"],
-
-        "MPA": ["Microscopic Polyangiitis", "ANCA", "AAV"],
-
-        "EGPA": ["Eosinophilic granulomatosis and polyangiitis", "Churg-Strauss"],
-
-        "immune-complex vasculitis": ["Immune-Complex Mediated Vasculitis"],
-
-        "IgA vasculitis": ["IgA vasculitis"],
-
-        "Urticarial vasculitis": ["Urticarial vasculitis"],
-
-        "anti-GBM": ["ANTI-GLOMERULAR BASEMENT MEMBRANE DISEASE", "Anti-GBM disease", "Goodpasture Disease"],
-
-        "Osteoarthritis": ["osteoarthritis", "oa ", "oa,", "oa.", "oa)", "degenerative joint disease"],
-
-        "Cryo": ["Cryoglobulinemic Vasculitis", "Mixed Cryoglobulinemia Syndrome", "cryoglobulinemia"],
-
-        "Behcet's": ["Behçet's"],
-        
-        "Gout": ["gout", "gouty arthritis"],
-
-        "CPPD": ["Calcium pyrophosphate deposition disease", "pseudogout", "crowned dens"],
-
-        "PCNSV": ["Primary CNS vasculitis", "Primary angiitis of the CNS", "PACNS"],
-
-        "Still's Disease": ["Adult-onset Still's Disease", "Stills Disease", "systemic JIA", "AOSD"],
-
-        "Sarcoidosis": ["sarcoid"],
-
-        "IgG4-RD": ["IgG4-related disease", "MIKULICZ", "Riedel's thyroiditis"],
-
-        "Relapsing polychondritis": ["RPC", "polychondritis", "VEXAS"],
-              
-        "Fibromyalgia": ["fibromyalgia", "fibromyalgia syndrome", "fms ", "fms,", "fms.", "fms)"],
-        
-        "ILD": ["interstitial lung disease", "ild ", "ild,", "ild.", "ild)", "pulmonary fibrosis", "IPF", "NSIP", "UIP", "fibrotic lung disease"]
-    }
+    # STRATEGY 4: Include specific sections of the document text for matching
+    # First 200 chars often contain the abstract which has key terms
+    if text and len(text) > 200:
+        tag_candidates.append(text[:200])
     
-    # Document types
-    document_types = {
-        "Guideline": ["guideline", "guidelines", "recommendation", "consensus", "eular", "acr criteria", "practice guidelines"],
-        "Clinical Trial": ["clinical trial", "phase iii", "phase 3", "randomized", "randomised", "rct ", "rct,", "rct.", "randomized controlled trial"],
-        "Meta-Analysis": ["meta-analysis", "meta analysis", "systematic review"],
-        "Cohort Study": ["cohort study", "longitudinal study", "observational study", "prospective studies", "retrospective studies"],
-        "Case Report": ["case report", "case series"],
-        "Review": ["review", "literature review", "primer"],
-        "Cross-Sectional Study": ["cross-sectional study"],
-        "Case-Control Study": ["case-control study"],
-        "Registries": ["registries"],
-        "Real-World Evidence": ["real-world evidence"],
-        "Epidemiology": ["epidemiology"],
-        "Incidence": ["incidence"],
-        "Prevalence": ["prevalence"],
-        "Disease Burden": ["disease burden"],
-        "Risk Factors": ["risk factors"],
-        "Comorbidity": ["comorbidity"],
-        "Population Surveillance": ["population surveillance"],
-        "Health Services Research": ["health services research"],
-        "Outcomes Research": ["outcomes research"]
-    }
+    # Also include any paragraphs that mention "conclusion" as they often contain key concepts
+    conclusion_match = re.search(r'(?:Conclusion|Summary)s?[:\s]+([^\.]+\.){1,3}', text, re.IGNORECASE)
+    if conclusion_match:
+        tag_candidates.append(conclusion_match.group(0))
     
-    # Store category names for later use
-    all_disease_keys = list(diseases.keys())
-    all_document_type_keys = list(document_types.keys())
-    all_domain_keys = all_disease_keys + all_document_type_keys
+    # Now use our helper function to match against predefined tags
+    # This ensures we only use standardized tags from our dictionaries
+    matched_tags = match_to_predefined_tags(text_content=text, tag_candidates=tag_candidates)
     
-    # STRATEGY 4: Content-based extraction using domain knowledge
-    # If we still don't have enough tags, fall back to the specialized approach
-    if len(tags) < 3:
-        # Convert text to lowercase for case-insensitive matching
-        text_lower = text.lower()
-        
-        # Find matches
-        content_tags = []
-        tag_scores = {}  # Track how relevant each tag is based on frequency
-        
-        # Check for disease terms with frequency analysis
-        for disease, terms in diseases.items():
-            # Initialize score for this disease
-            tag_scores[disease] = 0
-            
-            # Make disease name lowercase for case-insensitive matching
-            disease_lower = disease.lower()
-            
-            for term in terms:
-                # Count occurrences of the term
-                count = text_lower.count(term.lower())
-                if count > 0:
-                    # Add to the score for this disease
-                    tag_scores[disease] += count
-        
-        # Treatment categories have been removed as requested
-        
-        # Check for document type terms with frequency analysis
-        for doc_type, terms in document_types.items():
-            # Initialize score for this document type
-            tag_scores[doc_type] = 0
-            
-            # Make document type lowercase for case-insensitive matching
-            doc_type_lower = doc_type.lower()
-            
-            for term in terms:
-                # Count occurrences of the term (case-insensitive)
-                count = text_lower.count(term.lower())
-                if count > 0:
-                    # Add to the score for this document type
-                    tag_scores[doc_type] += count
-        
-        # Filter out tags with low scores (mentioned only a few times)
-        # and sort by score (most frequently mentioned first)
-        significant_tags = []
-        for tag, score in sorted(tag_scores.items(), key=lambda x: x[1], reverse=True):
-            # Only include tags mentioned at least 5 times - increased threshold to avoid false positives
-            # This helps filter out diseases mentioned only in passing
-            if score >= 5:
-                significant_tags.append(tag)
-        
-        # Add content-based tags that aren't already in our tags list
-        for tag in significant_tags[:3]:  # Limit to top 3 most significant tags
-            if tag not in tags:
-                tags.append(tag)
+    # If no predefined tags were matched, use some general fallback tags
+    if not matched_tags:
+        matched_tags = ["Rheumatology", "Research Paper"]
     
-    # Limit to 5 tags maximum
-    if len(tags) > 5:
-        # If we have explicitly detected keywords, prioritize them
-        explicit_keywords = []
-        domain_tags = []
-        
-        # Determine which tags came from explicit keywords vs. domain detection
-        for tag in tags:
-            if tag in all_domain_keys:
-                domain_tags.append(tag)
-            else:
-                explicit_keywords.append(tag)
-        
-        # Prioritize explicit keywords, then domain-specific tags
-        final_tags = explicit_keywords[:3]  # Take up to 3 explicit keywords
-        remaining_slots = 5 - len(final_tags)
-        
-        if remaining_slots > 0:
-            final_tags.extend(domain_tags[:remaining_slots])
-        
-        tags = final_tags[:5]
+    # The match_to_predefined_tags function already:
+    # 1. Matches text against our standard disease/document type dictionaries
+    # 2. Scores and sorts tags by relevance
+    # 3. Limits to 6 tags maximum
     
-    # If no tags were found, add some general ones
-    if not tags:
-        tags = ["Rheumatology", "Research Paper"]
-    
-    return tags
+    return matched_tags

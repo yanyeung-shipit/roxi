@@ -405,13 +405,17 @@ def get_mesh_terms_for_rheumatology(pmid: str) -> List[str]:
 def generate_tags_from_pubmed(pmid: str) -> List[str]:
     """
     Generate document tags using PubMed MeSH terms and other metadata.
+    Ensures that tags are matched against our predefined list of allowed tags.
     
     Args:
         pmid (str): The PubMed ID
         
     Returns:
-        List[str]: Generated tags
+        List[str]: Generated tags that match our predefined tag list
     """
+    # Import our tag matching function from document_processor
+    from utils.document_processor import match_to_predefined_tags
+    
     # Get paper details first
     paper_details = get_paper_details_by_pmid(pmid)
     if not paper_details:
@@ -420,38 +424,37 @@ def generate_tags_from_pubmed(pmid: str) -> List[str]:
     # Get rheumatology-specific MeSH terms
     rheum_terms = get_mesh_terms_for_rheumatology(pmid)
     
-    # Extract additional keywords from title and abstract
-    keywords = []
-    
-    # Important rheumatology keywords to look for
-    rheum_keywords = [
-        'Rheumatoid Arthritis', 'RA', 'Systemic Lupus Erythematosus', 'SLE', 'Lupus',
-        'Ankylosing Spondylitis', 'AS', 'Psoriatic Arthritis', 'PsA', 'Psoriasis',
-        'Sjögren', 'Scleroderma', 'SSc', 'Myositis', 'Vasculitis', 'ANCA',
-        'Gout', 'Osteoarthritis', 'OA', 'Polymyalgia Rheumatica', 'PMR',
-        'Giant Cell Arteritis', 'GCA', 'Fibromyalgia', 'FMS', 'Raynaud',
-        'Behçet', 'Antiphospholipid', 'APS', 'Mixed Connective Tissue Disease', 'MCTD',
-        'Juvenile Arthritis', 'JIA', 'Dermatomyositis', 'Polymyositis', 'Anti-CCP',
-        'RF', 'Rheumatoid Factor', 'TNF', 'Biologics', 'DMARDs', 'ILD', 
-        'Interstitial Lung Disease', 'Guidelines', 'Guideline', 'EULAR', 'ACR'
-    ]
-    
-    # Check title and abstract for keywords
+    # Extract title and abstract for text analysis
     title = paper_details.get('title', '')
     abstract = paper_details.get('abstract', '')
-    full_text = f"{title} {abstract}".lower()
     
-    for keyword in rheum_keywords:
-        if keyword.lower() in full_text:
-            # Use the original keyword formatting in our tags
-            # This ensures consistent tag presentation
-            keywords.append(keyword)
+    # Create tag candidates list from MeSH terms
+    tag_candidates = rheum_terms.copy()
     
-    # Combine all tags and remove duplicates
-    all_tags = list(set(rheum_terms + keywords))
+    # Add title and abstract as candidates
+    if title:
+        tag_candidates.append(title)
+    if abstract:
+        tag_candidates.append(abstract)
     
-    # Limit to 15 most relevant tags
-    return all_tags[:15]
+    # Add individual MeSH keywords from the paper if available
+    if 'keywords' in paper_details and isinstance(paper_details['keywords'], list):
+        for keyword in paper_details['keywords']:
+            if isinstance(keyword, str):
+                tag_candidates.append(keyword)
+    
+    # Use our standardized tag matching function to match against predefined tags
+    matched_tags = match_to_predefined_tags(
+        text_content=f"{title} {abstract}",
+        tag_candidates=tag_candidates
+    )
+    
+    # The match_to_predefined_tags function already:
+    # 1. Matches text against our standard disease/document type dictionaries
+    # 2. Scores and sorts tags by relevance
+    # 3. Limits to 6 tags maximum
+    
+    return matched_tags
 
 def doi_to_pmid(doi: str) -> Optional[str]:
     """
