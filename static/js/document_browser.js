@@ -1005,14 +1005,9 @@ function initDocumentBrowser() {
                 }
             }
             
-            // Truncate authors to fit on one line
-            let authorsText = doc.authors || 'Unknown authors';
-            const maxAuthorsLength = 50; // Approximate length that fits on one line
-            if (authorsText.length > maxAuthorsLength) {
-                authorsText = authorsText.substring(0, maxAuthorsLength) + '...';
-            }
+            card.innerHTML = `
                 <div class="document-title"><strong>${doc.title || 'Untitled Document'}</strong></div>
-                <div class="document-authors">${authorsText}</div>
+                <div class="document-authors">${doc.authors || 'Unknown authors'}</div>
                 <div class="document-date">${formattedDate}</div>
                 ${tagsHtml}
                 ${collectionHtml}
