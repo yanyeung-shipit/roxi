@@ -1,188 +1,156 @@
-/**
- * Document Browser - Client-side JavaScript functionality
- * 
- * This file handles all the client-side interactivity for the document browser page,
- * including document listing, filtering, editing, and collection management.
- */
-
-/**
- * Initialize the document browser functionality
- */
-function initDocumentBrowser() {
-    // Get DOM elements with null checks
-    const searchInput = document.getElementById('searchInput');
-    const documentList = document.getElementById('documentList');
-    const documentCount = document.getElementById('documentCount');
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM Elements
+    const documentsList = document.getElementById('documentsList');
+    const paginationContainer = document.getElementById('pagination');
     const documentDetails = document.getElementById('documentDetails');
-    const pagination = document.getElementById('pagination');
+    const actionButtons = document.getElementById('actionButtons');
+    const searchInput = document.getElementById('searchInput');
     const collectionFilter = document.getElementById('collectionFilter');
-    const uploadCollection = document.getElementById('uploadCollection');
-    const actionButtons = document.querySelector('.action-buttons');
-    const newCollectionButton = document.getElementById('newCollectionButton');
-    const manageCollectionsButton = document.getElementById('manageCollectionsButton');
-    const editDocumentButton = document.getElementById('editDocumentButton');
-    const deleteDocumentButton = document.getElementById('deleteDocumentButton');
-    const refreshDocumentsBtn = document.getElementById('refreshDocumentsBtn');
-    const toggleMultiSelectBtn = document.getElementById('toggleMultiSelectBtn');
-    const multiSelectActions = document.getElementById('multiSelectActions');
-    const selectedCount = document.getElementById('selectedCount');
-    const batchMoveBtn = document.getElementById('batchMoveBtn');
-    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    const totalDocumentsCounter = document.getElementById('totalDocuments');
+    const selectedDocumentsCounter = document.getElementById('selectedDocuments');
+    const tagsFilter = document.getElementById('tagsFilter');
+    const batchDeleteButton = document.getElementById('batchDeleteButton');
+    const batchMoveButton = document.getElementById('batchMoveButton');
+    const multiSelectToggleButton = document.getElementById('multiSelectToggle');
+    const cancelMultiSelectButton = document.getElementById('cancelMultiSelect');
+    const multiSelectActionsBar = document.getElementById('multiSelectActionsBar');
     
-    // Modals with null checks
-    const editDocumentModal = document.getElementById('editDocumentModal') ? 
-        new bootstrap.Modal(document.getElementById('editDocumentModal')) : null;
-    const collectionModal = document.getElementById('collectionModal') ? 
-        new bootstrap.Modal(document.getElementById('collectionModal')) : null;
-    const manageCollectionsModal = document.getElementById('manageCollectionsModal') ?
-        new bootstrap.Modal(document.getElementById('manageCollectionsModal')) : null;
-    const deleteConfirmModal = document.getElementById('deleteConfirmModal') ?
-        new bootstrap.Modal(document.getElementById('deleteConfirmModal')) : null;
-    const batchMoveModal = document.getElementById('batchMoveModal') ?
-        new bootstrap.Modal(document.getElementById('batchMoveModal')) : null;
-    
-    // Modal elements
-    const editDocumentId = document.getElementById('editDocumentId');
-    const editDocumentTitle = document.getElementById('editDocumentTitle');
-    const editDocumentAuthors = document.getElementById('editDocumentAuthors');
-    const editDocumentJournal = document.getElementById('editDocumentJournal');
-    const editDocumentPublicationDate = document.getElementById('editDocumentPublicationDate');
-    const editDocumentDOI = document.getElementById('editDocumentDOI');
-    const editDocumentTags = document.getElementById('editDocumentTags');
-    const editDocumentCollection = document.getElementById('editDocumentCollection');
-    const saveDocumentButton = document.getElementById('saveDocumentButton');
-    const citationPreview = document.getElementById('citationPreview');
-    
-    const collectionId = document.getElementById('collectionId');
-    const collectionName = document.getElementById('collectionName');
-    const collectionDescription = document.getElementById('collectionDescription');
-    const collectionParent = document.getElementById('collectionParent');
-    const collectionModalTitle = document.getElementById('collectionModalTitle');
-    const saveCollectionButton = document.getElementById('saveCollectionButton');
-    const deleteCollectionButton = document.getElementById('deleteCollectionButton');
-    
-    const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
-    const confirmDeleteButton = document.getElementById('confirmDeleteButton');
-    
-    const batchMoveCollection = document.getElementById('batchMoveCollection');
-    const batchMoveSaveButton = document.getElementById('batchMoveSaveButton');
-    
-    // State
+    // State variables
     let currentPage = 1;
     let totalPages = 1;
-    let activeTag = null;
-    let activeCollection = '';
-    let searchTerm = '';
-    let documents = [];
-    let collections = [];
+    let pageSize = 20;
     let currentDocumentId = null;
-    let deleteType = null; // 'document' or 'collection'
-    let deleteId = null;
     let isMultiSelectMode = false;
     let selectedDocuments = new Set();
+    let collections = [];
+    let documentTags = [];
+    let currentFilters = {
+        search: '',
+        collection_id: 'all',
+        tags: []
+    };
     
-    // Initial load
-    if (documentList) {
+    // Initialize
+    loadCollections().then(() => {
         loadDocuments();
-    }
-    if (collectionFilter) {
-        loadCollections();
-    }
+        loadTags();
+    });
     
-    // Handle search input
+    // Event Listeners
     if (searchInput) {
         searchInput.addEventListener('input', debounce(function() {
-            searchTerm = searchInput.value.trim();
+            currentFilters.search = this.value;
             currentPage = 1;
             loadDocuments();
         }, 300));
     }
     
-    // Handle collection filter change
     if (collectionFilter) {
         collectionFilter.addEventListener('change', function() {
-            activeCollection = collectionFilter.value;
+            currentFilters.collection_id = this.value;
             currentPage = 1;
             loadDocuments();
         });
     }
     
-    // Handle refresh button
-    if (refreshDocumentsBtn) {
-        refreshDocumentsBtn.addEventListener('click', function() {
+    if (tagsFilter) {
+        $(tagsFilter).on('change', function() {
+            currentFilters.tags = $(this).val();
+            currentPage = 1;
             loadDocuments();
-            loadCollections();
         });
     }
     
-    // Handle multi-select toggle
-    if (toggleMultiSelectBtn) {
-        toggleMultiSelectBtn.addEventListener('click', function() {
+    if (multiSelectToggleButton) {
+        multiSelectToggleButton.addEventListener('click', function() {
             isMultiSelectMode = !isMultiSelectMode;
             toggleMultiSelectMode();
         });
     }
     
-    // Handle batch move button
-    if (batchMoveBtn) {
-        batchMoveBtn.addEventListener('click', function() {
-            if (selectedDocuments.size === 0) return;
-            
-            // Populate the batch move modal
-            populateBatchMoveModal();
-            if (batchMoveModal) {
-                batchMoveModal.show();
+    if (cancelMultiSelectButton) {
+        cancelMultiSelectButton.addEventListener('click', function() {
+            isMultiSelectMode = false;
+            selectedDocuments.clear();
+            toggleMultiSelectMode();
+        });
+    }
+    
+    if (batchDeleteButton) {
+        batchDeleteButton.addEventListener('click', function() {
+            if (selectedDocuments.size > 0) {
+                if (confirm(`Are you sure you want to delete ${selectedDocuments.size} document(s)? This cannot be undone.`)) {
+                    batchDeleteDocuments();
+                }
             }
         });
     }
     
-    // Handle batch delete button
-    if (batchDeleteBtn) {
-        batchDeleteBtn.addEventListener('click', function() {
-            if (selectedDocuments.size === 0) return;
-            
-            // Set up confirmation modal
-            deleteType = 'batch';
-            if (deleteConfirmMessage) {
-                deleteConfirmMessage.textContent = `Are you sure you want to delete ${selectedDocuments.size} selected document(s)? This action cannot be undone.`;
-            }
-            if (deleteConfirmModal) {
-                deleteConfirmModal.show();
+    if (batchMoveButton) {
+        batchMoveButton.addEventListener('click', function() {
+            if (selectedDocuments.size > 0) {
+                // Populate collection dropdown for the move modal
+                const collectionSelect = document.getElementById('moveToCollection');
+                collectionSelect.innerHTML = '';
+                
+                // Add root option
+                const rootOption = document.createElement('option');
+                rootOption.value = '';
+                rootOption.textContent = '-- Root (No Collection) --';
+                collectionSelect.appendChild(rootOption);
+                
+                // Add collections recursively
+                function addCollectionOptions(collections, level = 0) {
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        option.textContent = '  '.repeat(level) + collection.name + ` (${collection.document_count} docs)`;
+                        collectionSelect.appendChild(option);
+                        
+                        if (collection.children && collection.children.length > 0) {
+                            addCollectionOptions(collection.children, level + 1);
+                        }
+                    });
+                }
+                
+                addCollectionOptions(collections);
+                
+                // Show modal
+                $('#batchMoveModal').modal('show');
             }
         });
     }
     
-    // Handle batch move save
-    if (batchMoveSaveButton && batchMoveCollection) {
-        batchMoveSaveButton.addEventListener('click', function() {
-            const collectionIdValue = batchMoveCollection.value;
-            if (selectedDocuments.size === 0) return;
+    // Handle form submission for batch move
+    const batchMoveForm = document.getElementById('batchMoveForm');
+    if (batchMoveForm) {
+        batchMoveForm.addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            const docIds = Array.from(selectedDocuments);
+            const collectionId = document.getElementById('moveToCollection').value;
             
-            // Send request to move documents
             fetch('/documents/api/documents/batch/move', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    document_ids: docIds,
-                    collection_id: collectionIdValue === '' ? null : collectionIdValue
+                    document_ids: Array.from(selectedDocuments),
+                    collection_id: collectionId === '' ? null : collectionId
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showAlert('Documents moved successfully', 'success');
-                    if (batchMoveModal) {
-                        batchMoveModal.hide();
-                    }
+                    showAlert(`${selectedDocuments.size} document(s) moved successfully`, 'success');
                     
                     // Reset multi-select
                     isMultiSelectMode = false;
                     selectedDocuments.clear();
                     toggleMultiSelectMode();
+                    
+                    // Close modal
+                    $('#batchMoveModal').modal('hide');
                     
                     // Reload documents
                     loadDocuments();
@@ -196,304 +164,504 @@ function initDocumentBrowser() {
         });
     }
     
-    // Handle the new collection button
-    if (newCollectionButton && collectionModal) {
-        newCollectionButton.addEventListener('click', function() {
-            // Clear the form for a new collection
-            if (collectionId) collectionId.value = '';
-            if (collectionName) collectionName.value = '';
-            if (collectionDescription) collectionDescription.value = '';
-            if (collectionParent) collectionParent.value = '';
-            
-            // Update modal title and buttons
-            if (collectionModalTitle) {
-                collectionModalTitle.textContent = 'Create New Collection';
-            }
-            if (deleteCollectionButton) {
-                deleteCollectionButton.classList.add('d-none');
-            }
-            
-            // Show the modal
-            collectionModal.show();
+    // Functions
+    function loadDocuments() {
+        // Build query string from filters
+        const params = new URLSearchParams({
+            page: currentPage,
+            per_page: pageSize
         });
-    }
-    
-    // Handle the manage collections button
-    if (manageCollectionsButton && manageCollectionsModal) {
-        manageCollectionsButton.addEventListener('click', function() {
-            // Load collections data for the table
-            loadCollectionsTable();
-            
-            // Show the modal
-            manageCollectionsModal.show();
-        });
-    }
-    
-    // Handle collection form submission
-    if (saveCollectionButton && collectionName) {
-        saveCollectionButton.addEventListener('click', function() {
-            const isEdit = collectionId && collectionId.value !== '';
-            const url = isEdit 
-                ? `/documents/api/collections/${collectionId.value}` 
-                : '/documents/api/collections';
-            const method = isEdit ? 'PUT' : 'POST';
-            
-            // Validate form
-            if (!collectionName.value.trim()) {
-                showAlert('Collection name is required', 'warning');
-                return;
-            }
-            
-            // Prepare data
-            const data = {
-                name: collectionName.value.trim(),
-                description: collectionDescription ? collectionDescription.value.trim() : '',
-                parent_id: collectionParent && collectionParent.value === '' ? null : (collectionParent ? collectionParent.value : null)
-            };
-            
-            // Send request
-            fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            })
+        
+        if (currentFilters.search) {
+            params.append('search', currentFilters.search);
+        }
+        
+        if (currentFilters.collection_id && currentFilters.collection_id !== 'all') {
+            params.append('collection_id', currentFilters.collection_id);
+        }
+        
+        if (currentFilters.tags && currentFilters.tags.length > 0) {
+            params.append('tags', currentFilters.tags.join(','));
+        }
+        
+        fetch(`/documents/api/documents?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    // Show success message
-                    showAlert(`Collection ${isEdit ? 'updated' : 'created'} successfully`, 'success');
-                    
-                    // Close modal
-                    if (collectionModal) {
-                        collectionModal.hide();
-                    }
-                    
-                    // Reload collections
-                    loadCollections();
-                } else {
-                    throw new Error(data.error || `Failed to ${isEdit ? 'update' : 'create'} collection`);
+                if (documentsList) {
+                    renderDocuments(data.documents);
                 }
+                
+                if (paginationContainer) {
+                    renderPagination(data.total, data.page, data.per_page);
+                }
+                
+                if (totalDocumentsCounter) {
+                    totalDocumentsCounter.textContent = data.total;
+                }
+                
+                // Update selected counter
+                if (selectedDocumentsCounter) {
+                    selectedDocumentsCounter.textContent = selectedDocuments.size;
+                }
+                
+                updateMultiSelectUI();
             })
             .catch(error => {
-                showAlert('Error: ' + error.message, 'danger');
+                console.error('Failed to load documents:', error);
+                showAlert('Failed to load documents. Please try again.', 'danger');
             });
+    }
+    
+    function renderDocuments(documents) {
+        documentsList.innerHTML = '';
+        
+        if (documents.length === 0) {
+            documentsList.innerHTML = `
+                <div class="text-center p-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <p class="text-muted">No documents found. Try different filters or upload a new document.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        documents.forEach(doc => {
+            const card = document.createElement('div');
+            card.className = 'card mb-3 document-card';
+            card.setAttribute('data-document-id', doc.id);
+            
+            if (selectedDocuments.has(doc.id)) {
+                card.classList.add('selected');
+            }
+            
+            // Format date
+            const uploadDate = new Date(doc.upload_date);
+            const formattedDate = uploadDate.toLocaleDateString('en-US', {
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric'
+            });
+            
+            // Limit title length
+            const displayTitle = doc.title ? 
+                (doc.title.length > 50 ? doc.title.substring(0, 50) + '...' : doc.title) : 
+                'Untitled Document';
+            
+            // Format tags
+            const tagsHtml = doc.tags && doc.tags.length > 0 ? 
+                doc.tags.slice(0, 3).map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join('') +
+                (doc.tags.length > 3 ? `<span class="badge bg-light text-dark">+${doc.tags.length - 3}</span>` : '') :
+                '<span class="text-muted small">No tags</span>';
+            
+            // Collection path
+            const collectionPath = doc.collection_path ? 
+                `<div class="small text-muted"><i class="feather feather-folder"></i> ${doc.collection_path}</div>` :
+                '';
+            
+            card.innerHTML = `
+                <div class="card-body py-2">
+                    <div class="d-flex align-items-center">
+                        ${isMultiSelectMode ? `
+                            <div class="form-check me-2">
+                                <input class="form-check-input document-select-checkbox" type="checkbox" value="${doc.id}" 
+                                    ${selectedDocuments.has(doc.id) ? 'checked' : ''} 
+                                    id="check-${doc.id}">
+                                <label class="form-check-label" for="check-${doc.id}"></label>
+                            </div>
+                        ` : ''}
+                        <div class="document-icon me-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <div class="flex-grow-1 document-info">
+                            <h6 class="mb-0 document-title">${displayTitle}</h6>
+                            <div class="small text-muted">Uploaded on ${formattedDate}</div>
+                            ${collectionPath}
+                            <div class="mt-1">${tagsHtml}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            documentsList.appendChild(card);
+            
+            // Add click handlers
+            if (!isMultiSelectMode) {
+                card.addEventListener('click', function() {
+                    loadDocumentDetails(doc.id);
+                });
+            } else {
+                const checkbox = card.querySelector('.document-select-checkbox');
+                if (checkbox) {
+                    checkbox.addEventListener('change', function() {
+                        if (this.checked) {
+                            selectedDocuments.add(doc.id);
+                            card.classList.add('selected');
+                        } else {
+                            selectedDocuments.delete(doc.id);
+                            card.classList.remove('selected');
+                        }
+                        
+                        // Update counter
+                        if (selectedDocumentsCounter) {
+                            selectedDocumentsCounter.textContent = selectedDocuments.size;
+                        }
+                        
+                        updateMultiSelectUI();
+                    });
+                    
+                    // Make the card also toggle the checkbox
+                    card.addEventListener('click', function(e) {
+                        if (!e.target.matches('.form-check-input')) {
+                            checkbox.checked = !checkbox.checked;
+                            
+                            // Trigger change event
+                            const event = new Event('change');
+                            checkbox.dispatchEvent(event);
+                        }
+                    });
+                }
+            }
         });
     }
     
-    // Handle collection deletion
-    if (deleteCollectionButton && collectionId) {
-        deleteCollectionButton.addEventListener('click', function() {
-            if (!collectionId.value) return;
-            
-            // Set up confirmation modal
-            deleteType = 'collection';
-            deleteId = collectionId.value;
-            if (deleteConfirmMessage) {
-                deleteConfirmMessage.textContent = 'Are you sure you want to delete this collection? Documents will be moved to the root level.';
-            }
-            
-            // Hide collection modal and show confirmation modal
-            if (collectionModal) {
-                collectionModal.hide();
-            }
-            if (deleteConfirmModal) {
-                deleteConfirmModal.show();
-            }
-        });
-    }
-    
-    // Handle delete confirmation
-    if (confirmDeleteButton) {
-        confirmDeleteButton.addEventListener('click', function() {
-            if (deleteType === 'document' && deleteId) {
-                deleteDocument(deleteId);
-            } else if (deleteType === 'collection' && deleteId) {
-                deleteCollection(deleteId);
-            } else if (deleteType === 'batch') {
-                batchDeleteDocuments();
-            }
-            
-            // Close modal
-            if (deleteConfirmModal) {
-                deleteConfirmModal.hide();
-            }
-        });
-    }
-    
-    // Handle document editing
-    if (editDocumentButton && editDocumentModal) {
-        editDocumentButton.addEventListener('click', function() {
-            if (!currentDocumentId) return;
-            
-            // Find current document
-            const doc = documents.find(d => d.id === currentDocumentId);
-            if (!doc) return;
-            
-            // Populate form
-            if (editDocumentId) editDocumentId.value = doc.id;
-            if (editDocumentTitle) editDocumentTitle.value = doc.title || '';
-            if (editDocumentAuthors) editDocumentAuthors.value = doc.authors || '';
-            if (editDocumentJournal) editDocumentJournal.value = doc.journal || '';
-            if (editDocumentPublicationDate) editDocumentPublicationDate.value = doc.publication_date ? doc.publication_date.split('T')[0] : '';
-            if (editDocumentDOI) editDocumentDOI.value = doc.doi || '';
-            if (editDocumentTags) editDocumentTags.value = doc.tags ? doc.tags.join(', ') : '';
-            if (editDocumentCollection) editDocumentCollection.value = doc.collection_id || '';
-            
-            // Update citation preview
-            updateCitationPreview();
-            
-            // Show modal
-            editDocumentModal.show();
-        });
-    }
-
-    // Handle document view PDF (opens in new tab)
-    document.addEventListener('click', function(e) {
-        if (e.target.matches('.view-pdf-button') || e.target.closest('.view-pdf-button')) {
-            const button = e.target.matches('.view-pdf-button') ? e.target : e.target.closest('.view-pdf-button');
-            const documentId = button.dataset.id;
-            if (documentId) {
-                window.open(`/documents/view/${documentId}`, '_blank');
+    function renderPagination(total, currentPage, pageSize) {
+        totalPages = Math.ceil(total / pageSize);
+        
+        if (totalPages <= 1) {
+            paginationContainer.innerHTML = '';
+            return;
+        }
+        
+        paginationContainer.innerHTML = `
+            <nav aria-label="Document pagination">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" data-page="${currentPage - 1}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+        `;
+        
+        // Add page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            // Show limited page numbers with ellipsis
+            if (
+                i === 1 || 
+                i === totalPages || 
+                (i >= currentPage - 2 && i <= currentPage + 2)
+            ) {
+                paginationContainer.querySelector('ul').innerHTML += `
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" data-page="${i}">${i}</a>
+                    </li>
+                `;
+            } else if (
+                (i === currentPage - 3 && currentPage > 3) || 
+                (i === currentPage + 3 && currentPage < totalPages - 2)
+            ) {
+                paginationContainer.querySelector('ul').innerHTML += `
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#">...</a>
+                    </li>
+                `;
             }
         }
-    });
-    
-    // Handle document form submission
-    if (saveDocumentButton && editDocumentId && editDocumentTitle) {
-        saveDocumentButton.addEventListener('click', function() {
-            if (!editDocumentId.value) return;
-            
-            // Validate form
-            if (!editDocumentTitle.value.trim()) {
-                showAlert('Document title is required', 'warning');
-                return;
-            }
-            
-            // Prepare data
-            const data = {
-                title: editDocumentTitle.value.trim(),
-                authors: editDocumentAuthors ? editDocumentAuthors.value.trim() : '',
-                journal: editDocumentJournal ? editDocumentJournal.value.trim() : '',
-                publication_date: editDocumentPublicationDate ? editDocumentPublicationDate.value || null : null,
-                doi: editDocumentDOI ? editDocumentDOI.value.trim() : '',
-                tags: editDocumentTags && editDocumentTags.value.trim() ? 
-                     editDocumentTags.value.split(',').map(tag => tag.trim()) : [],
-                collection_id: editDocumentCollection && editDocumentCollection.value === '' ? 
-                              null : (editDocumentCollection ? editDocumentCollection.value : null)
-            };
-            
-            // Send request
-            fetch(`/documents/api/documents/${editDocumentId.value}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Show success message
-                    showAlert('Document updated successfully', 'success');
-                    
-                    // Close modal
-                    if (editDocumentModal) {
-                        editDocumentModal.hide();
-                    }
-                    
-                    // Reload documents and show updated document
+        
+        paginationContainer.querySelector('ul').innerHTML += `
+                    <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="#" data-page="${currentPage + 1}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        `;
+        
+        // Add event listeners to page links
+        paginationContainer.querySelectorAll('.page-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = parseInt(this.dataset.page);
+                if (page && page !== currentPage && page > 0 && page <= totalPages) {
+                    currentPage = page;
                     loadDocuments();
-                } else {
-                    throw new Error(data.error || 'Failed to update document');
                 }
-            })
-            .catch(error => {
-                showAlert('Error: ' + error.message, 'danger');
             });
         });
     }
     
-    // Handle document deletion
-    if (deleteDocumentButton && deleteConfirmModal) {
-        deleteDocumentButton.addEventListener('click', function() {
-            if (!currentDocumentId) return;
-            
-            // Set up confirmation modal
-            deleteType = 'document';
-            deleteId = currentDocumentId;
-            if (deleteConfirmMessage) {
-                deleteConfirmMessage.textContent = 'Are you sure you want to delete this document? This action cannot be undone.';
-            }
-            
-            // Show confirmation modal
-            deleteConfirmModal.show();
-        });
-    }
-    
-    /**
-     * Delete a document
-     */
-    function deleteDocument(docId) {
-        fetch(`/documents/api/documents/${docId}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showAlert('Document deleted successfully', 'success');
-                currentDocumentId = null;
-                loadDocuments();
+    function loadDocumentDetails(documentId) {
+        if (!documentDetails) return;
+        
+        currentDocumentId = documentId;
+        
+        fetch(`/documents/api/documents/${documentId}`)
+            .then(response => response.json())
+            .then(doc => {
+                // Format date
+                const uploadDate = new Date(doc.upload_date);
+                const formattedUploadDate = uploadDate.toLocaleDateString('en-US', {
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric'
+                });
                 
-                // Clear document details
-                if (documentDetails) {
-                    documentDetails.innerHTML = `
-                        <div class="text-center p-5">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                            <p class="text-muted">Select a document to view details</p>
+                let pubDateFormatted = 'Not available';
+                if (doc.publication_date) {
+                    const pubDate = new Date(doc.publication_date);
+                    pubDateFormatted = pubDate.toLocaleDateString('en-US', {
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric'
+                    });
+                }
+                
+                // Format tags with edit capability
+                const tagsHtml = doc.tags && doc.tags.length > 0 ? 
+                    doc.tags.map(tag => `<div class="badge bg-secondary me-1 mb-1">${tag}</div>`).join('') :
+                    '<span class="text-muted">No tags</span>';
+                
+                // Collection path
+                const collectionPath = doc.collection_path ? 
+                    `<span class="text-muted"><i class="feather feather-folder"></i> ${doc.collection_path}</span>` :
+                    '<span class="text-muted"><i class="feather feather-folder"></i> No Collection</span>';
+                
+                // DOI display
+                const doiHtml = doc.doi ? 
+                    `<a href="https://doi.org/${doc.doi}" target="_blank">${doc.doi}</a>` :
+                    '<span class="text-muted">Not available</span>';
+                
+                documentDetails.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <h4 class="card-title">${doc.title || 'Untitled Document'}</h4>
+                                <div>
+                                    <a href="/documents/view/${doc.id}" class="btn btn-outline-primary btn-sm" target="_blank">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        View PDF
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                ${collectionPath}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <strong>Authors:</strong> 
+                                <p>${doc.authors || 'Not available'}</p>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Journal:</strong> 
+                                    <p>${doc.journal || 'Not available'}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Publication Date:</strong> 
+                                    <p>${pubDateFormatted}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <strong>DOI:</strong> 
+                                <p>${doiHtml}</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <strong>Uploaded:</strong> 
+                                <p>${formattedUploadDate}</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong>Tags:</strong>
+                                    <button class="btn btn-outline-secondary btn-sm" id="editTagsBtn" data-document-id="${doc.id}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit-2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                        Edit Tags
+                                    </button>
+                                </div>
+                                <div class="d-flex flex-wrap mt-2" id="documentTagsContainer">
+                                    ${tagsHtml}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <strong>Citation:</strong>
+                                <div class="citation-container p-2 bg-light border rounded">
+                                    ${doc.citation_apa || 'Citation not available'}
+                                </div>
+                                <button class="btn btn-outline-secondary btn-sm mt-2" onclick="navigator.clipboard.writeText('${doc.citation_apa?.replace(/'/g, "\\'") || ''}').then(() => showAlert('Citation copied to clipboard', 'success'))">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clipboard"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                                    Copy Citation
+                                </button>
+                            </div>
                         </div>
-                    `;
+                    </div>
+                `;
+                
+                // Add event listener to edit tags button
+                const editTagsBtn = document.getElementById('editTagsBtn');
+                if (editTagsBtn) {
+                    editTagsBtn.addEventListener('click', function() {
+                        showEditTagsModal(doc.id, doc.tags || []);
+                    });
                 }
                 
-                // Hide action buttons
+                // Show action buttons
                 if (actionButtons) {
-                    actionButtons.classList.add('d-none');
+                    actionButtons.innerHTML = `
+                        <button class="btn btn-outline-primary me-2" id="editDocumentBtn" data-document-id="${doc.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            Edit Metadata
+                        </button>
+                        <button class="btn btn-outline-secondary me-2" id="moveDocumentBtn" data-document-id="${doc.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-folder"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                            Move
+                        </button>
+                        <button class="btn btn-outline-danger" id="deleteDocumentBtn" data-document-id="${doc.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash-2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            Delete
+                        </button>
+                    `;
+                    actionButtons.classList.remove('d-none');
+                    
+                    // Add event listeners to action buttons
+                    document.getElementById('editDocumentBtn').addEventListener('click', function() {
+                        showEditDocumentModal(doc.id);
+                    });
+                    
+                    document.getElementById('moveDocumentBtn').addEventListener('click', function() {
+                        showMoveDocumentModal(doc.id);
+                    });
+                    
+                    document.getElementById('deleteDocumentBtn').addEventListener('click', function() {
+                        if (confirm('Are you sure you want to delete this document? This cannot be undone.')) {
+                            deleteDocument(doc.id);
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Failed to load document details:', error);
+                documentDetails.innerHTML = `
+                    <div class="alert alert-danger">
+                        Failed to load document details. Please try again.
+                    </div>
+                `;
+            });
+    }
+    
+    function loadCollections() {
+        return fetch('/documents/api/collections')
+            .then(response => response.json())
+            .then(data => {
+                collections = data.collections;
+                
+                if (collectionFilter) {
+                    collectionFilter.innerHTML = '<option value="all">All Collections</option>';
+                    
+                    // No collection option
+                    const noCollectionOption = document.createElement('option');
+                    noCollectionOption.value = 'none';
+                    noCollectionOption.textContent = 'No Collection';
+                    collectionFilter.appendChild(noCollectionOption);
+                    
+                    // Add collections recursively
+                    function addCollectionOptions(collections, level = 0) {
+                        collections.forEach(collection => {
+                            const option = document.createElement('option');
+                            option.value = collection.id;
+                            option.textContent = '  '.repeat(level) + collection.name + ` (${collection.document_count})`;
+                            collectionFilter.appendChild(option);
+                            
+                            if (collection.children && collection.children.length > 0) {
+                                addCollectionOptions(collection.children, level + 1);
+                            }
+                        });
+                    }
+                    
+                    addCollectionOptions(collections);
+                }
+                
+                return collections;
+            });
+    }
+    
+    function loadTags() {
+        return fetch('/documents/api/tags')
+            .then(response => response.json())
+            .then(data => {
+                documentTags = data.tags;
+                
+                if (tagsFilter) {
+                    // Initialize select2 for tags filter
+                    $(tagsFilter).empty();
+                    
+                    documentTags.forEach(tag => {
+                        const option = new Option(tag, tag, false, false);
+                        $(tagsFilter).append(option);
+                    });
+                    
+                    $(tagsFilter).trigger('change');
+                }
+                
+                return documentTags;
+            });
+    }
+    
+    function toggleMultiSelectMode() {
+        // Toggle class on document cards based on selection state
+        const documentCards = document.querySelectorAll('.document-card');
+        documentCards.forEach(card => {
+            if (isMultiSelectMode) {
+                const docId = card.getAttribute('data-document-id');
+                
+                if (selectedDocuments.has(docId)) {
+                    card.classList.add('selected');
+                }
+                
+                // Remove existing click handlers
+                const newCard = card.cloneNode(true);
+                card.parentNode.replaceChild(newCard, card);
+            }
+        });
+        
+        // Show/hide multi-select actions bar
+        if (multiSelectActionsBar) {
+            if (isMultiSelectMode) {
+                multiSelectActionsBar.classList.remove('d-none');
+                
+                // Update counter
+                if (selectedDocumentsCounter) {
+                    selectedDocumentsCounter.textContent = selectedDocuments.size;
                 }
             } else {
-                throw new Error(data.error || 'Failed to delete document');
+                multiSelectActionsBar.classList.add('d-none');
             }
-        })
-        .catch(error => {
-            showAlert('Error: ' + error.message, 'danger');
-        });
+        }
+        
+        // Toggle buttons
+        if (multiSelectToggleButton) {
+            multiSelectToggleButton.textContent = isMultiSelectMode ? 'Cancel Selection' : 'Select Multiple';
+        }
+        
+        // Reload documents to apply multi-select mode
+        loadDocuments();
     }
     
-    /**
-     * Delete a collection
-     */
-    function deleteCollection(collId) {
-        fetch(`/documents/api/collections/${collId}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showAlert('Collection deleted successfully', 'success');
-                loadCollections();
-                loadDocuments();
-            } else {
-                throw new Error(data.error || 'Failed to delete collection');
-            }
-        })
-        .catch(error => {
-            showAlert('Error: ' + error.message, 'danger');
-        });
+    function updateMultiSelectUI() {
+        // Enable/disable batch action buttons based on selection
+        if (batchDeleteButton) {
+            batchDeleteButton.disabled = selectedDocuments.size === 0;
+        }
+        
+        if (batchMoveButton) {
+            batchMoveButton.disabled = selectedDocuments.size === 0;
+        }
     }
     
-    /**
-     * Delete batch of documents
-     */
     function batchDeleteDocuments() {
         if (selectedDocuments.size === 0) return;
         
@@ -508,9 +676,15 @@ function initDocumentBrowser() {
                 document_ids: docIds
             })
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
+        .then(response => {
+            // Always read the JSON, regardless of status code
+            return response.json().then(data => {
+                return { ok: response.ok, status: response.status, data };
+            });
+        })
+        .then(result => {
+            // Check if the operation was successful
+            if (result.data.success) {
                 showAlert(`${docIds.length} document(s) deleted successfully`, 'success');
                 
                 // Reset multi-select
@@ -539,7 +713,8 @@ function initDocumentBrowser() {
                     }
                 }
             } else {
-                throw new Error(data.error || 'Failed to delete documents');
+                // Handle error from the server
+                throw new Error(result.data.error || 'Failed to delete documents');
             }
         })
         .catch(error => {
@@ -547,1015 +722,312 @@ function initDocumentBrowser() {
         });
     }
     
-    /**
-     * Toggle multi-select mode for documents
-     */
-    function toggleMultiSelectMode() {
-        if (!documentList) return;
-        
-        const documentCards = documentList.querySelectorAll('.document-card');
-        
-        if (isMultiSelectMode) {
-            // Enable multi-select mode
-            if (toggleMultiSelectBtn) {
-                toggleMultiSelectBtn.classList.add('active');
-            }
-            if (multiSelectActions) {
-                multiSelectActions.classList.remove('d-none');
-            }
-            
-            documentCards.forEach(card => {
-                card.classList.add('multi-select-mode');
-                const checkbox = document.createElement('div');
-                checkbox.className = 'document-select-checkbox';
-                checkbox.innerHTML = '<i class="far fa-square"></i>';
-                card.prepend(checkbox);
+    function deleteDocument(documentId) {
+        fetch(`/documents/api/documents/${documentId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Document deleted successfully', 'success');
                 
-                // Add click handler for checkbox
-                checkbox.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const docId = card.dataset.id;
-                    if (selectedDocuments.has(docId)) {
-                        selectedDocuments.delete(docId);
-                        checkbox.innerHTML = '<i class="far fa-square"></i>';
-                        card.classList.remove('selected');
-                    } else {
-                        selectedDocuments.add(docId);
-                        checkbox.innerHTML = '<i class="fas fa-check-square"></i>';
-                        card.classList.add('selected');
-                    }
-                    
-                    updateSelectedCount();
-                });
-            });
-        } else {
-            // Disable multi-select mode
-            if (toggleMultiSelectBtn) {
-                toggleMultiSelectBtn.classList.remove('active');
-            }
-            if (multiSelectActions) {
-                multiSelectActions.classList.add('d-none');
-            }
-            
-            selectedDocuments.clear();
-            
-            documentCards.forEach(card => {
-                card.classList.remove('multi-select-mode');
-                card.classList.remove('selected');
-                const checkbox = card.querySelector('.document-select-checkbox');
-                if (checkbox) {
-                    checkbox.remove();
-                }
-            });
-        }
-        
-        updateSelectedCount();
-    }
-    
-    /**
-     * Update the selected count display
-     */
-    function updateSelectedCount() {
-        if (selectedCount) {
-            selectedCount.textContent = `${selectedDocuments.size} selected`;
-        }
-        
-        // Enable/disable batch action buttons based on selection
-        if (batchMoveBtn) {
-            batchMoveBtn.disabled = selectedDocuments.size === 0;
-        }
-        if (batchDeleteBtn) {
-            batchDeleteBtn.disabled = selectedDocuments.size === 0;
-        }
-    }
-    
-    /**
-     * Populate the batch move modal with collections
-     */
-    function populateBatchMoveModal() {
-        if (!batchMoveCollection) return;
-        
-        batchMoveCollection.innerHTML = '<option value="">None (Root Level)</option>';
-        
-        // Sort collections by name with root collections first
-        const sortedCollections = [...collections].sort((a, b) => {
-            // Sort by parent_id (null first) then by name
-            if ((a.parent_id === null) !== (b.parent_id === null)) {
-                return (a.parent_id === null) ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-        });
-        
-        sortedCollections.forEach(coll => {
-            const depth = getCollectionDepth(coll);
-            const prefix = '— '.repeat(depth);
-            const option = document.createElement('option');
-            option.value = coll.id;
-            option.textContent = prefix + coll.name;
-            batchMoveCollection.appendChild(option);
-        });
-    }
-    
-    /**
-     * Helper function to get collection depth
-     */
-    function getCollectionDepth(collection) {
-        let depth = 0;
-        let curr = collection;
-        
-        while (curr.parent_id !== null) {
-            depth++;
-            const parent = collections.find(c => c.id === curr.parent_id);
-            if (!parent) break;
-            curr = parent;
-        }
-        
-        return depth;
-    }
-    
-    /**
-     * Load collections data
-     */
-    function loadCollections() {
-        fetch('/documents/api/collections')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    collections = data.collections || [];
-                    
-                    // Sort collections by name with root collections first
-                    const sortedCollections = [...collections].sort((a, b) => {
-                        // Sort by parent_id (null first) then by name
-                        if ((a.parent_id === null) !== (b.parent_id === null)) {
-                            return (a.parent_id === null) ? -1 : 1;
-                        }
-                        return a.name.localeCompare(b.name);
-                    });
-                    
-                    // Populate collection filters
-                    if (collectionFilter) {
-                        collectionFilter.innerHTML = '<option value="">All Collections</option>';
-                        
-                        sortedCollections.forEach(coll => {
-                            const depth = getCollectionDepth(coll);
-                            const prefix = '— '.repeat(depth);
-                            const option = document.createElement('option');
-                            option.value = coll.id;
-                            option.textContent = prefix + coll.name;
-                            if (coll.id === activeCollection) {
-                                option.selected = true;
-                            }
-                            collectionFilter.appendChild(option);
-                        });
-                    }
-                    
-                    // Populate upload collection dropdown
-                    if (uploadCollection) {
-                        uploadCollection.innerHTML = '<option value="">None</option>';
-                        
-                        sortedCollections.forEach(coll => {
-                            const depth = getCollectionDepth(coll);
-                            const prefix = '— '.repeat(depth);
-                            const option = document.createElement('option');
-                            option.value = coll.id;
-                            option.textContent = prefix + coll.name;
-                            uploadCollection.appendChild(option);
-                        });
-                    }
-                    
-                    // Populate edit document collection dropdown
-                    if (editDocumentCollection) {
-                        editDocumentCollection.innerHTML = '<option value="">None</option>';
-                        
-                        sortedCollections.forEach(coll => {
-                            const depth = getCollectionDepth(coll);
-                            const prefix = '— '.repeat(depth);
-                            const option = document.createElement('option');
-                            option.value = coll.id;
-                            option.textContent = prefix + coll.name;
-                            editDocumentCollection.appendChild(option);
-                        });
-                    }
-                    
-                    // Populate collection parent dropdown
-                    if (collectionParent) {
-                        collectionParent.innerHTML = '<option value="">None (Root Collection)</option>';
-                        
-                        sortedCollections.forEach(coll => {
-                            // Skip current collection as it can't be its own parent
-                            if (collectionId && coll.id === collectionId.value) return;
-                            
-                            const depth = getCollectionDepth(coll);
-                            // Skip if depth > 1 to maintain max hierarchy depth of 3
-                            if (depth > 1) return;
-                            
-                            const prefix = '— '.repeat(depth);
-                            const option = document.createElement('option');
-                            option.value = coll.id;
-                            option.textContent = prefix + coll.name;
-                            collectionParent.appendChild(option);
-                        });
-                    }
-                } else {
-                    console.error('Failed to load collections:', data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading collections:', error);
-                showAlert('Error loading collections', 'danger');
-            });
-    }
-    
-    /**
-     * Load collections for the manage collections table
-     */
-    function loadCollectionsTable() {
-        const collectionTableBody = document.querySelector('#manageCollectionsModal .modal-body table tbody');
-        if (!collectionTableBody) return;
-        
-        fetch('/documents/api/collections')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Sort collections by hierarchy and name
-                    const sortedCollections = [...data.collections].sort((a, b) => {
-                        const pathA = a.full_path || a.name;
-                        const pathB = b.full_path || b.name;
-                        return pathA.localeCompare(pathB);
-                    });
-                    
-                    // Clear existing table rows
-                    collectionTableBody.innerHTML = '';
-                    
-                    // Add collection rows
-                    sortedCollections.forEach(coll => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${coll.name}</td>
-                            <td>${coll.full_path || coll.name}</td>
-                            <td>${coll.total_documents || 0}</td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-primary edit-collection-btn" data-id="${coll.id}">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-outline-danger delete-collection-btn" data-id="${coll.id}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        `;
-                        collectionTableBody.appendChild(row);
-                    });
-                    
-                    // Add event listeners to edit and delete buttons
-                    const editButtons = collectionTableBody.querySelectorAll('.edit-collection-btn');
-                    const deleteButtons = collectionTableBody.querySelectorAll('.delete-collection-btn');
-                    
-                    editButtons.forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            const collId = btn.dataset.id;
-                            editCollection(collId);
-                        });
-                    });
-                    
-                    deleteButtons.forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            const collId = btn.dataset.id;
-                            
-                            // Set up confirmation modal
-                            deleteType = 'collection';
-                            deleteId = collId;
-                            if (deleteConfirmMessage) {
-                                deleteConfirmMessage.textContent = 'Are you sure you want to delete this collection? Documents will be moved to the root level.';
-                            }
-                            
-                            // Hide manage collections modal and show confirmation modal
-                            if (manageCollectionsModal) {
-                                manageCollectionsModal.hide();
-                            }
-                            if (deleteConfirmModal) {
-                                deleteConfirmModal.show();
-                            }
-                        });
-                    });
-                } else {
-                    console.error('Failed to load collections:', data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading collections:', error);
-                showAlert('Error loading collections', 'danger');
-            });
-    }
-    
-    /**
-     * Edit a collection
-     */
-    function editCollection(collId) {
-        // Find collection data
-        const collection = collections.find(c => c.id === collId);
-        if (!collection) return;
-        
-        // Populate form
-        if (collectionId) collectionId.value = collection.id;
-        if (collectionName) collectionName.value = collection.name;
-        if (collectionDescription) collectionDescription.value = collection.description || '';
-        if (collectionParent) collectionParent.value = collection.parent_id || '';
-        
-        // Update modal title and buttons
-        if (collectionModalTitle) {
-            collectionModalTitle.textContent = 'Edit Collection';
-        }
-        if (deleteCollectionButton) {
-            deleteCollectionButton.classList.remove('d-none');
-        }
-        
-        // Hide manage collections modal and show collection modal
-        if (manageCollectionsModal) {
-            manageCollectionsModal.hide();
-        }
-        if (collectionModal) {
-            collectionModal.show();
-        }
-    }
-    
-    /**
-     * Load documents with search, filtering, and pagination
-     */
-    function loadDocuments() {
-        if (!documentList) return;
-        
-        // Show loading indicator
-        documentList.innerHTML = `
-            <div class="text-center p-5">
-                <div class="spinner-border text-secondary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-3 text-muted">Loading documents...</p>
-            </div>
-        `;
-        
-        // Build query parameters
-        let params = new URLSearchParams();
-        params.append('page', currentPage);
-        
-        if (searchTerm) {
-            params.append('search', searchTerm);
-        }
-        
-        if (activeCollection) {
-            params.append('collection_id', activeCollection);
-        }
-        
-        if (activeTag) {
-            params.append('tag', activeTag);
-        }
-        
-        // Fetch documents
-        fetch(`/documents/api/documents?${params.toString()}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    documents = data.documents || [];
-                    totalPages = data.total_pages || 1;
-                    
-                    // Update document count
-                    if (documentCount) {
-                        documentCount.textContent = `${data.total_documents || 0} document${data.total_documents !== 1 ? 's' : ''}`;
-                    }
-                    
-                    displayDocuments();
-                    updatePagination();
-                } else {
-                    console.error('Failed to load documents:', data.error);
-                    documentList.innerHTML = `
+                // Reload documents
+                loadDocuments();
+                
+                // Clear document details
+                currentDocumentId = null;
+                if (documentDetails) {
+                    documentDetails.innerHTML = `
                         <div class="text-center p-5">
-                            <div class="alert alert-danger">
-                                Error loading documents: ${data.error || 'Unknown error'}
-                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <p class="text-muted">Select a document to view details</p>
                         </div>
                     `;
+                }
+                
+                // Hide action buttons
+                if (actionButtons) {
+                    actionButtons.classList.add('d-none');
+                }
+            } else {
+                throw new Error(data.error || 'Failed to delete document');
+            }
+        })
+        .catch(error => {
+            showAlert('Error: ' + error.message, 'danger');
+        });
+    }
+    
+    // Show edit document modal with current data
+    function showEditDocumentModal(documentId) {
+        fetch(`/documents/api/documents/${documentId}`)
+            .then(response => response.json())
+            .then(doc => {
+                // Populate modal fields
+                document.getElementById('editDocumentId').value = doc.id;
+                document.getElementById('editTitle').value = doc.title || '';
+                document.getElementById('editAuthors').value = doc.authors || '';
+                document.getElementById('editJournal').value = doc.journal || '';
+                document.getElementById('editDoi').value = doc.doi || '';
+                
+                // Format date for input field (YYYY-MM-DD)
+                if (doc.publication_date) {
+                    const pubDate = new Date(doc.publication_date);
+                    const year = pubDate.getFullYear();
+                    const month = String(pubDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(pubDate.getDate()).padStart(2, '0');
+                    document.getElementById('editPublicationDate').value = `${year}-${month}-${day}`;
+                } else {
+                    document.getElementById('editPublicationDate').value = '';
+                }
+                
+                // Show modal
+                $('#editDocumentModal').modal('show');
+            })
+            .catch(error => {
+                console.error('Failed to load document for editing:', error);
+                showAlert('Failed to load document for editing', 'danger');
+            });
+    }
+    
+    // Show move document modal with current collection selected
+    function showMoveDocumentModal(documentId) {
+        fetch(`/documents/api/documents/${documentId}`)
+            .then(response => response.json())
+            .then(doc => {
+                // Populate modal fields
+                document.getElementById('moveDocumentId').value = doc.id;
+                
+                // Populate collection dropdown
+                const collectionSelect = document.getElementById('moveToCollectionSingle');
+                collectionSelect.innerHTML = '';
+                
+                // Add root option
+                const rootOption = document.createElement('option');
+                rootOption.value = '';
+                rootOption.textContent = '-- Root (No Collection) --';
+                collectionSelect.appendChild(rootOption);
+                
+                // Add collections recursively
+                function addCollectionOptions(collections, level = 0) {
+                    collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection.id;
+                        option.textContent = '  '.repeat(level) + collection.name + ` (${collection.document_count} docs)`;
+                        option.selected = doc.collection_id === collection.id;
+                        collectionSelect.appendChild(option);
+                        
+                        if (collection.children && collection.children.length > 0) {
+                            addCollectionOptions(collection.children, level + 1);
+                        }
+                    });
+                }
+                
+                addCollectionOptions(collections);
+                
+                // Show modal
+                $('#moveDocumentModal').modal('show');
+            })
+            .catch(error => {
+                console.error('Failed to load document for moving:', error);
+                showAlert('Failed to load document for moving', 'danger');
+            });
+    }
+    
+    // Show edit tags modal
+    function showEditTagsModal(documentId, currentTags) {
+        // Populate the modal
+        document.getElementById('editTagsDocumentId').value = documentId;
+        
+        // Initialize select2 for tags
+        const tagsSelect = $('#editTagsSelect');
+        tagsSelect.empty();
+        
+        // Add current tags and available tags
+        documentTags.forEach(tag => {
+            const option = new Option(tag, tag, false, currentTags.includes(tag));
+            tagsSelect.append(option);
+        });
+        
+        // Allow adding new tags
+        tagsSelect.select2({
+            tags: true,
+            tokenSeparators: [','],
+            placeholder: 'Select or type new tags',
+            allowClear: true
+        });
+        
+        // Set selected values
+        tagsSelect.val(currentTags).trigger('change');
+        
+        // Show modal
+        $('#editTagsModal').modal('show');
+    }
+    
+    // Event handlers for form submissions
+    
+    // Edit document form
+    const editDocumentForm = document.getElementById('editDocumentForm');
+    if (editDocumentForm) {
+        editDocumentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const documentId = document.getElementById('editDocumentId').value;
+            const title = document.getElementById('editTitle').value;
+            const authors = document.getElementById('editAuthors').value;
+            const journal = document.getElementById('editJournal').value;
+            const doi = document.getElementById('editDoi').value;
+            const publicationDate = document.getElementById('editPublicationDate').value;
+            
+            fetch(`/documents/api/documents/${documentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: title,
+                    authors: authors,
+                    journal: journal,
+                    doi: doi,
+                    publication_date: publicationDate
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Document updated successfully', 'success');
+                    
+                    // Close modal
+                    $('#editDocumentModal').modal('hide');
+                    
+                    // Reload document details
+                    loadDocumentDetails(documentId);
+                    
+                    // Refresh the document list
+                    loadDocuments();
+                } else {
+                    throw new Error(data.error || 'Failed to update document');
                 }
             })
             .catch(error => {
-                console.error('Error loading documents:', error);
-                documentList.innerHTML = `
-                    <div class="text-center p-5">
-                        <div class="alert alert-danger">
-                            Error loading documents: ${error.message || 'Network error'}
-                        </div>
-                    </div>
-                `;
+                showAlert('Error: ' + error.message, 'danger');
             });
-    }
-    
-    /**
-     * Display documents in the document list
-     */
-    function displayDocuments() {
-        if (!documentList) return;
-        
-        if (documents.length === 0) {
-            documentList.innerHTML = `
-                <div class="text-center p-5">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search mb-3"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <h5>No documents found</h5>
-                    <p class="text-muted">Try adjusting your search or filters</p>
-                </div>
-            `;
-            return;
-        }
-        
-        documentList.innerHTML = '';
-        
-        documents.forEach(doc => {
-            const card = document.createElement('div');
-            card.className = 'document-card';
-            card.dataset.id = doc.id;
-            
-            // Format publication date
-            let formattedDate = 'Unknown date';
-            if (doc.publication_date) {
-                const date = new Date(doc.publication_date);
-                formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-            }
-            
-            // Create tags HTML
-            let tagsHtml = '';
-            if (doc.tags && doc.tags.length > 0) {
-                tagsHtml = `
-                    <div class="document-tags">
-                        ${doc.tags.slice(0, 3).map(tag => `<span class="badge bg-secondary">${tag}</span>`).join(' ')}
-                        ${doc.tags.length > 3 ? `<span class="badge bg-secondary">+${doc.tags.length - 3}</span>` : ''}
-                    </div>
-                `;
-            }
-            
-            // Create collection badge HTML
-            let collectionHtml = '';
-            if (doc.collection_id) {
-                const collection = collections.find(c => c.id === doc.collection_id);
-                if (collection) {
-                    collectionHtml = `
-                        <div class="document-collection">
-                            <i class="fas fa-folder"></i> ${collection.name}
-                        </div>
-                    `;
-                }
-            }
-            
-            card.innerHTML = `
-                <div class="document-title"><strong>${doc.title || 'Untitled Document'}</strong></div>
-                <div class="document-authors">${doc.authors || 'Unknown authors'}</div>
-                <div class="document-date">${formattedDate}</div>
-                ${tagsHtml}
-                ${collectionHtml}
-            `;
-            
-            // Add click handler
-            card.addEventListener('click', function() {
-                if (isMultiSelectMode) {
-                    // Handle multi-select click
-                    const checkbox = card.querySelector('.document-select-checkbox');
-                    if (checkbox) {
-                        checkbox.click();
-                    }
-                } else {
-                    // Handle regular click to show document details
-                    currentDocumentId = doc.id;
-                    displayDocumentDetails(doc);
-                    
-                    // Add selected class to this card and remove from others
-                    document.querySelectorAll('.document-card').forEach(c => {
-                        c.classList.remove('active');
-                    });
-                    card.classList.add('active');
-                }
-            });
-            
-            documentList.appendChild(card);
         });
-        
-        // Re-apply multi-select if active
-        if (isMultiSelectMode) {
-            toggleMultiSelectMode();
-        }
     }
     
-    /**
-     * Display document details
-     */
-    function displayDocumentDetails(doc) {
-        if (!documentDetails) return;
-        
-        // Format document data
-        const publicationDate = doc.publication_date 
-            ? new Date(doc.publication_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-            : 'Not specified';
+    // Move document form
+    const moveDocumentForm = document.getElementById('moveDocumentForm');
+    if (moveDocumentForm) {
+        moveDocumentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
             
-        // Get collection name
-        let collectionName = 'None';
-        if (doc.collection_id) {
-            const collection = collections.find(c => c.id === doc.collection_id);
-            if (collection) {
-                collectionName = collection.name;
-            }
-        }
-        
-        // Format tags
-        const tagsHtml = doc.tags && doc.tags.length > 0
-            ? doc.tags.map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join(' ')
-            : '<span class="text-muted">No tags</span>';
+            const documentId = document.getElementById('moveDocumentId').value;
+            const collectionId = document.getElementById('moveToCollectionSingle').value;
             
-        // Build detail HTML
-        documentDetails.innerHTML = `
-            <div class="document-detail-section">
-                <h5 class="mb-3">${doc.title || 'Untitled Document'}</h5>
-                
-                <div class="mb-3">
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-sm btn-primary view-pdf-button" data-id="${doc.id}">
-                            <i class="fas fa-file-pdf me-1"></i> View PDF
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">Authors</div>
-                    <div class="detail-value">${doc.authors || 'Unknown'}</div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">Journal</div>
-                    <div class="detail-value">${doc.journal || 'Not specified'}</div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">Publication Date</div>
-                    <div class="detail-value">${publicationDate}</div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">DOI</div>
-                    <div class="detail-value">
-                        ${doc.doi 
-                            ? `<a href="https://doi.org/${doc.doi}" target="_blank">${doc.doi}</a>` 
-                            : 'Not available'}
-                    </div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">Collection</div>
-                    <div class="detail-value">${collectionName}</div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">Upload Date</div>
-                    <div class="detail-value">
-                        ${new Date(doc.upload_date).toLocaleDateString('en-US', 
-                            { year: 'numeric', month: 'short', day: 'numeric' })}
-                    </div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">Tags</div>
-                    <div class="detail-value tags-container">
-                        ${tagsHtml}
-                    </div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">Citation</div>
-                    <div class="detail-value citation-preview">
-                        ${doc.citation_apa || 'Citation not available'}
-                    </div>
-                </div>
+            fetch(`/documents/api/documents/${documentId}/collection`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    collection_id: collectionId === '' ? null : collectionId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Document moved successfully', 'success');
+                    
+                    // Close modal
+                    $('#moveDocumentModal').modal('hide');
+                    
+                    // Reload document details
+                    loadDocumentDetails(documentId);
+                    
+                    // Refresh the document list
+                    loadDocuments();
+                } else {
+                    throw new Error(data.error || 'Failed to move document');
+                }
+            })
+            .catch(error => {
+                showAlert('Error: ' + error.message, 'danger');
+            });
+        });
+    }
+    
+    // Edit tags form
+    const editTagsForm = document.getElementById('editTagsForm');
+    if (editTagsForm) {
+        editTagsForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const documentId = document.getElementById('editTagsDocumentId').value;
+            const tags = $('#editTagsSelect').val();
+            
+            fetch(`/documents/api/documents/${documentId}/tags`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tags: tags
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Tags updated successfully', 'success');
+                    
+                    // Close modal
+                    $('#editTagsModal').modal('hide');
+                    
+                    // Reload document details
+                    loadDocumentDetails(documentId);
+                    
+                    // Refresh the document list and tags
+                    loadDocuments();
+                    loadTags();
+                } else {
+                    throw new Error(data.error || 'Failed to update tags');
+                }
+            })
+            .catch(error => {
+                showAlert('Error: ' + error.message, 'danger');
+            });
+        });
+    }
+    
+    // Utility to show alert messages
+    function showAlert(message, type) {
+        const alertPlaceholder = document.getElementById('alertPlaceholder');
+        if (!alertPlaceholder) return;
+        
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         `;
         
-        // Show action buttons
-        const actionButtonsElement = document.querySelector('.action-buttons');
-        if (actionButtonsElement) {
-            actionButtonsElement.classList.remove('d-none');
-        }
-    }
-    
-    /**
-     * Update pagination controls
-     */
-    function updatePagination() {
-        if (!pagination) return;
+        alertPlaceholder.innerHTML = alertHtml;
         
-        pagination.innerHTML = '';
-        
-        if (totalPages <= 1) {
-            return;
-        }
-        
-        // Previous button
-        const prevItem = document.createElement('li');
-        prevItem.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-        prevItem.innerHTML = `<a class="page-link" href="#" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a>`;
-        prevItem.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (currentPage > 1) {
-                currentPage--;
-                loadDocuments();
+        // Auto dismiss after 5 seconds
+        setTimeout(() => {
+            const alert = alertPlaceholder.querySelector('.alert');
+            if (alert) {
+                $(alert).alert('close');
             }
-        });
-        pagination.appendChild(prevItem);
-        
-        // Page numbers
-        const maxPages = 5; // Maximum number of page links to show
-        let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
-        let endPage = Math.min(totalPages, startPage + maxPages - 1);
-        
-        if (endPage - startPage + 1 < maxPages) {
-            startPage = Math.max(1, endPage - maxPages + 1);
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-            const pageItem = document.createElement('li');
-            pageItem.className = `page-item ${i === currentPage ? 'active' : ''}`;
-            pageItem.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-            
-            pageItem.addEventListener('click', function(e) {
-                e.preventDefault();
-                currentPage = i;
-                loadDocuments();
-            });
-            
-            pagination.appendChild(pageItem);
-        }
-        
-        // Next button
-        const nextItem = document.createElement('li');
-        nextItem.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-        nextItem.innerHTML = `<a class="page-link" href="#" aria-label="Next"><span aria-hidden="true">&raquo;</span></a>`;
-        nextItem.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (currentPage < totalPages) {
-                currentPage++;
-                loadDocuments();
-            }
-        });
-        pagination.appendChild(nextItem);
+        }, 5000);
     }
     
-    /**
-     * Update citation preview in edit document modal
-     */
-    function updateCitationPreview() {
-        if (!citationPreview || !editDocumentAuthors || !editDocumentTitle || 
-            !editDocumentJournal || !editDocumentPublicationDate) return;
-            
-        const authors = editDocumentAuthors.value.trim();
-        const title = editDocumentTitle.value.trim();
-        const journal = editDocumentJournal.value.trim();
-        const year = editDocumentPublicationDate.value 
-            ? new Date(editDocumentPublicationDate.value).getFullYear() 
-            : '';
-            
-        if (!authors && !title && !journal && !year) {
-            citationPreview.textContent = 'Citation will be generated automatically after saving';
-            return;
-        }
-        
-        let citation = '';
-        
-        if (authors) {
-            // Format author list
-            const authorList = authors.split(',').map(a => a.trim());
-            if (authorList.length === 1) {
-                citation += authorList[0];
-            } else if (authorList.length === 2) {
-                citation += `${authorList[0]} & ${authorList[1]}`;
-            } else {
-                citation += `${authorList[0]} et al.`;
-            }
-        } else {
-            citation += 'Unknown Author';
-        }
-        
-        if (year) {
-            citation += ` (${year})`;
-        }
-        
-        if (title) {
-            citation += `. ${title}`;
-        }
-        
-        if (journal) {
-            citation += `. ${journal}`;
-        }
-        
-        if (editDocumentDOI && editDocumentDOI.value.trim()) {
-            citation += `. https://doi.org/${editDocumentDOI.value.trim()}`;
-        }
-        
-        citationPreview.textContent = citation;
+    // Utility debounce function for search
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+        };
     }
-    
-    // Add event listeners for citation preview updates
-    if (editDocumentAuthors) {
-        editDocumentAuthors.addEventListener('input', updateCitationPreview);
-    }
-    if (editDocumentTitle) {
-        editDocumentTitle.addEventListener('input', updateCitationPreview);
-    }
-    if (editDocumentJournal) {
-        editDocumentJournal.addEventListener('input', updateCitationPreview);
-    }
-    if (editDocumentPublicationDate) {
-        editDocumentPublicationDate.addEventListener('input', updateCitationPreview);
-    }
-    if (editDocumentDOI) {
-        editDocumentDOI.addEventListener('input', updateCitationPreview);
-    }
-}
-
-/**
- * Initialize file upload functionality
- */
-function initFileUpload() {
-    const uploadForm = document.getElementById('uploadForm');
-    const fileInput = document.getElementById('fileInput');
-    const uploadArea = document.querySelector('.upload-area');
-    const uploadProgress = document.getElementById('uploadProgress');
-    const progressBar = uploadProgress ? uploadProgress.querySelector('.progress-bar') : null;
-    const uploadStatus = document.getElementById('uploadStatus');
-    const processingQueue = document.getElementById('processingQueue');
-    const queueProgress = document.getElementById('queueProgress');
-    const queueInfo = document.getElementById('queueInfo');
-    
-    if (!uploadForm || !fileInput) return;
-    
-    // Drag and drop functionality
-    if (uploadArea) {
-        uploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            uploadArea.classList.remove('dragover');
-            
-            // Check file types
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                
-                // Trigger upload if auto-upload enabled
-                // uploadForm.submit();
-            }
-        });
-        
-        uploadArea.addEventListener('click', function() {
-            fileInput.click();
-        });
-    }
-    
-    // Handle form submission
-    uploadForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const files = fileInput.files;
-        if (files.length === 0) {
-            showAlert('Please select at least one PDF file to upload', 'warning');
-            return;
-        }
-        
-        if (files.length > 50) {
-            showAlert('Maximum 50 files per upload allowed', 'warning');
-            return;
-        }
-        
-        // Check file types
-        for (let i = 0; i < files.length; i++) {
-            if (!files[i].name.toLowerCase().endsWith('.pdf')) {
-                showAlert('Only PDF files are accepted', 'warning');
-                return;
-            }
-        }
-        
-        // Start upload
-        uploadFiles(new FormData(uploadForm));
-    });
-    
-    // Function to upload files
-    function uploadFiles(formData) {
-        // Reset status
-        if (uploadStatus) {
-            uploadStatus.innerHTML = '';
-        }
-        
-        // Show progress bar
-        if (uploadProgress) {
-            uploadProgress.classList.remove('d-none');
-        }
-        if (progressBar) {
-            progressBar.style.width = '0%';
-        }
-        
-        // Send request
-        const xhr = new XMLHttpRequest();
-        
-        xhr.open('POST', '/upload', true);
-        
-        xhr.upload.addEventListener('progress', function(e) {
-            if (e.lengthComputable && progressBar) {
-                const percentComplete = Math.round((e.loaded / e.total) * 100);
-                progressBar.style.width = percentComplete + '%';
-                progressBar.setAttribute('aria-valuenow', percentComplete);
-            }
-        });
-        
-        xhr.addEventListener('load', function() {
-            if (xhr.status === 200) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    
-                    if (response.success) {
-                        // Show success message
-                        if (uploadStatus) {
-                            uploadStatus.innerHTML = `
-                                <div class="alert alert-success">
-                                    <i class="fas fa-check-circle me-2"></i>
-                                    Successfully uploaded ${response.uploaded} file(s)
-                                </div>
-                            `;
-                        }
-                        
-                        // Reset form
-                        uploadForm.reset();
-                        
-                        // Show processing queue
-                        if (processingQueue) {
-                            processingQueue.classList.remove('d-none');
-                        }
-                        
-                        // Start queue monitoring
-                        monitorQueue();
-                        
-                        // Reload documents
-                        if (typeof loadDocuments === 'function') {
-                            loadDocuments();
-                        }
-                    } else {
-                        throw new Error(response.error || 'Upload failed');
-                    }
-                } catch (error) {
-                    if (uploadStatus) {
-                        uploadStatus.innerHTML = `
-                            <div class="alert alert-danger">
-                                <i class="fas fa-exclamation-circle me-2"></i>
-                                Error: ${error.message}
-                            </div>
-                        `;
-                    }
-                }
-            } else {
-                if (uploadStatus) {
-                    uploadStatus.innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Error: Server returned status ${xhr.status}
-                        </div>
-                    `;
-                }
-            }
-            
-            // Hide progress bar
-            if (uploadProgress) {
-                uploadProgress.classList.add('d-none');
-            }
-        });
-        
-        xhr.addEventListener('error', function() {
-            if (uploadStatus) {
-                uploadStatus.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Network error occurred during upload
-                    </div>
-                `;
-            }
-            
-            // Hide progress bar
-            if (uploadProgress) {
-                uploadProgress.classList.add('d-none');
-            }
-        });
-        
-        xhr.send(formData);
-    }
-    
-    // Function to monitor processing queue
-    function monitorQueue() {
-        if (!processingQueue || !queueProgress || !queueInfo) return;
-        
-        // Check queue status every 3 seconds
-        const queueInterval = setInterval(function() {
-            fetch('/documents/api/processing-queue')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const processed = data.completed || 0;
-                        const pending = data.pending || 0;
-                        const processing = data.processing || 0;
-                        const total = processed + pending + processing;
-                        
-                        // Update progress bar
-                        if (total > 0) {
-                            const percentComplete = Math.round((processed / total) * 100);
-                            queueProgress.style.width = percentComplete + '%';
-                            queueProgress.setAttribute('aria-valuenow', percentComplete);
-                            
-                            queueInfo.textContent = `${processed} / ${total} processed`;
-                            
-                            // If all processed, stop monitoring and hide after a delay
-                            if (pending === 0 && processing === 0) {
-                                clearInterval(queueInterval);
-                                
-                                // Hide queue progress after 5 seconds
-                                setTimeout(function() {
-                                    processingQueue.classList.add('d-none');
-                                }, 5000);
-                                
-                                // Reload documents one final time
-                                if (typeof loadDocuments === 'function') {
-                                    loadDocuments();
-                                }
-                            }
-                        } else {
-                            // No documents in queue
-                            processingQueue.classList.add('d-none');
-                            clearInterval(queueInterval);
-                        }
-                    } else {
-                        console.error('Failed to get queue status:', data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error checking queue status:', error);
-                });
-        }, 3000);
-    }
-}
-
-/**
- * Show an alert message
- */
-function showAlert(message, type = 'info') {
-    // Create alert container if it doesn't exist
-    let alertContainer = document.getElementById('alertContainer');
-    if (!alertContainer) {
-        alertContainer = document.createElement('div');
-        alertContainer.id = 'alertContainer';
-        alertContainer.className = 'alert-container';
-        document.body.appendChild(alertContainer);
-    }
-    
-    // Create alert element
-    const alertElement = document.createElement('div');
-    alertElement.className = `alert alert-${type} alert-dismissible fade show`;
-    alertElement.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    `;
-    
-    // Add to container
-    alertContainer.appendChild(alertElement);
-    
-    // Auto-dismiss after 5 seconds
-    setTimeout(function() {
-        if (alertElement.parentNode) {
-            bootstrap.Alert.getOrCreateInstance(alertElement).close();
-        }
-    }, 5000);
-}
-
-/**
- * Debounce function to limit how often a function is called
- */
-function debounce(func, wait) {
-    let timeout;
-    return function() {
-        const context = this;
-        const args = arguments;
-        clearTimeout(timeout);
-        timeout = setTimeout(function() {
-            func.apply(context, args);
-        }, wait);
-    };
-}
+});
