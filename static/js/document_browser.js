@@ -355,7 +355,7 @@ function initDocumentBrowser() {
             const button = e.target.matches('.view-pdf-button') ? e.target : e.target.closest('.view-pdf-button');
             const documentId = button.dataset.id;
             if (documentId) {
-                window.open(`/documents/view/${documentId}`, '_blank');
+                window.open(`/api/documents/${documentId}/pdf`, '_blank');
             }
         }
     });
