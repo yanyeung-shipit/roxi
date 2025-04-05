@@ -452,7 +452,7 @@ def batch_delete_documents():
             return jsonify({
                 'success': False,
                 'error': f'Documents with IDs {not_found} not found'
-            }), 404
+            }), 200
             
         # For each document, delete chunks, embeddings, queue entries, and files
         deleted_count = 0
