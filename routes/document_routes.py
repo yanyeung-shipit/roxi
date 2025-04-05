@@ -75,7 +75,8 @@ def list_documents():
                 'publication_date': doc.publication_date.isoformat() if doc.publication_date else None,
                 'upload_date': doc.upload_date.isoformat(),
                 'processed': doc.processed,
-                'tags': doc.tags
+                'tags': doc.tags,
+                'citation_apa': doc.citation_apa
             }
             
             # Add collection info if available
