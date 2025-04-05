@@ -305,22 +305,44 @@ function initDocumentBrowser() {
     }
     
     // Handle delete confirmation
-    if (confirmDeleteButton) {
-        confirmDeleteButton.addEventListener('click', function() {
-            if (deleteType === 'document' && deleteId) {
-                deleteDocument(deleteId);
-            } else if (deleteType === 'collection' && deleteId) {
-                deleteCollection(deleteId);
-            } else if (deleteType === 'batch') {
-                batchDeleteDocuments();
-            }
-            
-            // Close modal
-            if (deleteConfirmModal) {
-                deleteConfirmModal.hide();
-            }
-        });
-    }
+
+// Updated confirmDeleteButton handler with debugging
+if (confirmDeleteButton) {
+    confirmDeleteButton.addEventListener('click', function() {
+        console.log('Confirm delete clicked:', { deleteType, deleteId });
+        
+        if (deleteType === 'document' && deleteId) {
+            console.log('Calling deleteDocument with ID:', deleteId);
+            deleteDocument(deleteId);
+        } else if (deleteType === 'collection' && deleteId) {
+            deleteCollection(deleteId);
+        } else if (deleteType === 'batch') {
+            batchDeleteDocuments();
+        } else {
+            console.error('Invalid delete operation:', { deleteType, deleteId });
+        }
+        
+        // Close modal
+        if (deleteConfirmModal) {
+            deleteConfirmModal.hide();
+        }
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     // Handle document editing
     if (editDocumentButton && editDocumentModal) {
@@ -413,37 +435,46 @@ function initDocumentBrowser() {
                 showAlert('Error: ' + error.message, 'danger');
             });
         });
-    }
-    
-    // Handle document deletion
-    if (deleteDocumentButton && deleteConfirmModal) {
-        deleteDocumentButton.addEventListener('click', function() {
-            if (!currentDocumentId) return;
-            
-            // Set up confirmation modal
-            deleteType = 'document';
-            deleteId = currentDocumentId;
-            if (deleteConfirmMessage) {
-                deleteConfirmMessage.textContent = 'Are you sure you want to delete this document? This action cannot be undone.';
-            }
-            
-            // Show confirmation modal
-            deleteConfirmModal.show();
-        });
-    }
-    
-    /**
-     * Delete a document
-     */
+
     function deleteDocument(docId) {
-        fetch(`/documents/api/documents/${docId}`, {
-            method: 'DELETE'
+        console.log(`Attempting to delete document with ID: ${docId}`);
+        
+        if (!docId) {
+            console.error('Invalid document ID for deletion:', docId);
+            showAlert('Error: Missing document ID', 'danger');
+            return;
+        }
+        
+        // Show a temporary loading message
+        showAlert('Deleting document...', 'info');
+        
+        const url = `/documents/api/documents/${docId}`;
+        console.log(`Sending DELETE request to: ${url}`);
+        
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Delete response status:', response.status);
+            if (!response.ok) {
+                // Log HTTP error details
+                console.error('Delete request failed with status:', response.status);
+                throw new Error(`HTTP error ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('Delete response data:', data);
             if (data.success) {
                 showAlert('Document deleted successfully', 'success');
                 currentDocumentId = null;
+                
+                // Refresh document list to reflect the change
+                console.log('Refreshing document list after deletion');
                 loadDocuments();
                 
                 // Clear document details
@@ -465,6 +496,76 @@ function initDocumentBrowser() {
             }
         })
         .catch(error => {
+            console.error('Error in delete operation:', error);
+            showAlert('Error: ' + error.message, 'danger');
+        });
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                if (documentDetails) {
+                    documentDetails.innerHTML = `
+                        <div class="text-center p-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <p class="text-muted">Select a document to view details</p>
+                        </div>
+                    `;
+                }
+                
+                // Hide action buttons
+                if (actionButtons) {
+                    actionButtons.classList.add('d-none');
+                }
+            } else {
+                throw new Error(data.error || 'Failed to delete document');
+            }
+        })
+        .catch(error => {
+            console.error('Error in delete operation:', error);
             showAlert('Error: ' + error.message, 'danger');
         });
     }
@@ -797,37 +898,86 @@ function initDocumentBrowser() {
                             <td>
                                 <div class="btn-group btn-group-sm">
                                     <button class="btn btn-outline-primary edit-collection-btn" data-id="${coll.id}">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-outline-danger delete-collection-btn" data-id="${coll.id}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        `;
-                        collectionTableBody.appendChild(row);
-                    });
+
+    function loadDocuments() {
+        if (!documentList) return;
+        
+        console.log('Loading documents with filters:', {
+            page: currentPage,
+            search: searchTerm,
+            tag: activeTag,
+            collection_id: activeCollection
+        });
+        
+        // Show loading indicator
+        documentList.innerHTML = `
+            <div class="text-center p-5">
+                <div class="spinner-border text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Loading documents...</p>
+            </div>
+        `;
+        
+        // Build query parameters
+        let params = new URLSearchParams();
+        params.append('page', currentPage);
+        
+        if (searchTerm) {
+            params.append('search', searchTerm);
+        }
+        
+        if (activeCollection) {
+            params.append('collection_id', activeCollection);        fetch(url)
+
+            .then(response => {
+                console.log('loadDocuments response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('loadDocuments response data:', data);
+                if (data.success) {
+                    documents = data.documents || [];
+                    totalPages = data.total_pages || 1;
                     
-                    // Add event listeners to edit and delete buttons
-                    const editButtons = collectionTableBody.querySelectorAll('.edit-collection-btn');
-                    const deleteButtons = collectionTableBody.querySelectorAll('.delete-collection-btn');
-                    
-                    editButtons.forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            const collId = btn.dataset.id;
-                            editCollection(collId);
-                        });
-                    });
-                    
-                    deleteButtons.forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            const collId = btn.dataset.id;
-                            
-                            // Set up confirmation modal
-                            deleteType = 'collection';
-                            deleteId = collId;
-                            if (deleteConfirmMessage) {
-                                deleteConfirmMessage.textContent = 'Are you sure you want to delete this collection? Documents will be moved to the root level.';
+                    console.log(`Loaded ${documents.length} documents (page ${currentPage} of ${totalPages})`);
+
+
+
+
+
+
+        console.log('Fetching documents from:', url);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                             }
                             
                             // Hide manage collections modal and show confirmation modal
@@ -886,6 +1036,13 @@ function initDocumentBrowser() {
     function loadDocuments() {
         if (!documentList) return;
         
+        console.log('Loading documents with filters:', {
+            page: currentPage,
+            search: searchTerm,
+            tag: activeTag,
+            collection_id: activeCollection
+        });
+        
         // Show loading indicator
         documentList.innerHTML = `
             <div class="text-center p-5">
@@ -912,8 +1069,11 @@ function initDocumentBrowser() {
             params.append('tag', activeTag);
         }
         
+        const url = `/documents/api/documents?${params.toString()}`;
+        console.log('Fetching documents from:', url);
+        
         // Fetch documents
-        fetch(`/documents/api/documents?${params.toString()}`)
+        fetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
