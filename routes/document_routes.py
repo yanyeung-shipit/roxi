@@ -45,7 +45,9 @@ def list_documents():
     try:
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        per_page = request.args.get('per_page', 25, type=int)
+        # Limit to reasonable values
+        per_page = min(max(per_page, 5), 100)
         
         # Get filter parameters
         search = request.args.get('search', '')

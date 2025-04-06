@@ -80,6 +80,7 @@ function initDocumentBrowser() {
     let deleteId = null;
     let isMultiSelectMode = false;
     let selectedDocuments = new Set();
+    let perPage = 25; // Default items per page
     
     // Initial load
     if (documentList) {
@@ -87,6 +88,16 @@ function initDocumentBrowser() {
     }
     if (collectionFilter) {
         loadCollections();
+    }
+    
+    // Handle per page selector
+    const perPageSelect = document.getElementById('perPageSelect');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function() {
+            perPage = parseInt(perPageSelect.value, 10);
+            currentPage = 1; // Reset to first page when changing items per page
+            loadDocuments();
+        });
     }
     
     // Handle search input
@@ -899,6 +910,7 @@ function initDocumentBrowser() {
         // Build query parameters
         let params = new URLSearchParams();
         params.append('page', currentPage);
+        params.append('per_page', perPage);
         
         if (searchTerm) {
             params.append('search', searchTerm);
