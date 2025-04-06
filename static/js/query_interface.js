@@ -46,8 +46,10 @@ function initQueryInterface() {
     function initConversation() {
         // Generate a new conversation ID
         currentConversationId = generateConversationId();
-        // Reset first query tracking
+        
+        // Reset first query tracking - this ensures we don't scroll on first query
         isFirstQuery = true;
+        console.log("Conversation initialized, isFirstQuery set to true");
         
         // Reset the query input
         queryInput.value = '';
@@ -105,17 +107,24 @@ function initQueryInterface() {
                     } else if (message.role === 'assistant') {
                         addMessageToConversation('assistant', message.content, message.citations);
                     }
-                });
-                
                 // Update the conversation title
-                // After first query, mark subsequent queries for scrolling
-                isFirstQuery = false;
+                // If there are messages, this isnt a first query situation
+                if (messages.length > 0) {
+                    isFirstQuery = false;
+                    console.log("Loaded conversation has messages, isFirstQuery set to false");
+                }
+                conversationTitle.textContent = "Conversation History";
+                
+                // Only scroll to bottom for existing conversations with messages
+                if (messages.length > 0) {
+                    conversationContainer.scrollTop = conversationContainer.scrollHeight;
+                }
                 conversationTitle.textContent = 'Conversation History';
                 
-        // Only scroll to bottom on follow-up queries
-        if (!isFirstQuery) {
-            conversationContainer.scrollTop = conversationContainer.scrollHeight;
-        }
+                // Only scroll to bottom for existing conversations with messages
+                if (messages.length > 0) {
+                    conversationContainer.scrollTop = conversationContainer.scrollHeight;
+                }
             })
             .catch(error => {
                 console.error('Error loading conversation:', error);
@@ -183,6 +192,7 @@ function initQueryInterface() {
                 // Update the conversation title
                 // After first query, mark subsequent queries for scrolling
                 isFirstQuery = false;
+                console.log("First query completed successfully, future queries will scroll");
                 conversationTitle.textContent = 'Conversation';
             } else {
                 // Show error message
@@ -194,6 +204,7 @@ function initQueryInterface() {
                 addMessageToConversation('assistant', errorMessage);
                 // After first query, mark subsequent queries for scrolling
                 isFirstQuery = false;
+                console.log("Error on first query but setting isFirstQuery to false anyway");
             }
             
         // Only scroll to bottom on follow-up queries
@@ -214,13 +225,17 @@ function initQueryInterface() {
                 </div>
             `;
             addMessageToConversation('assistant', errorMessage);
-                // After first query, mark subsequent queries for scrolling
-                isFirstQuery = false;
+            // After first query, mark subsequent queries for scrolling
+            isFirstQuery = false;
+            console.log("Error caught - setting isFirstQuery to false");
             
-        // Only scroll to bottom on follow-up queries
-        if (!isFirstQuery) {
-            conversationContainer.scrollTop = conversationContainer.scrollHeight;
-        }
+            // Only scroll to bottom on follow-up queries
+            if (!isFirstQuery) {
+                console.log("Query error but scrolling since it's not first query");
+                conversationContainer.scrollTop = conversationContainer.scrollHeight;
+            } else {
+                console.log("First query error - not scrolling");
+            }
         });
     }
     
