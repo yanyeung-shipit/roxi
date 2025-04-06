@@ -957,3 +957,60 @@ def view_document_pdf(document_id):
         }), 500
 
 # Document text quality endpoint has been removed as OCR functionality is no longer needed
+@document_routes.route('/api/documents/<int:document_id>/retry', methods=['POST'])
+def retry_document_processing(document_id):
+    """
+    Retry processing a document that previously failed
+    """
+    try:
+        document = Document.query.get(document_id)
+        
+        if not document:
+            return jsonify({
+                'success': False,
+                'error': f'Document with ID {document_id} not found'
+            }), 404
+        
+        # Check if the document is already processed successfully
+        if document.processed:
+            return jsonify({
+                'success': False,
+                'error': 'Document is already processed successfully'
+            }), 400
+            
+        # Get the existing queue entry if any
+        queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).first()
+        
+        # If the queue entry exists, reset it
+        if queue_entry:
+            queue_entry.status = 'pending'
+            queue_entry.error_message = None
+            queue_entry.started_at = None
+            queue_entry.completed_at = None
+            queue_entry.queued_at = datetime.datetime.utcnow()
+        else:
+            # Otherwise create a new queue entry
+            queue_entry = ProcessingQueue(
+                document_id=document_id,
+                status='pending',
+                queued_at=datetime.datetime.utcnow()
+            )
+            db.session.add(queue_entry)
+        
+        db.session.commit()
+        
+        # Trigger the document processing
+        from tasks import process_document
+        process_document.delay(document_id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Document processing restarted'
+        })
+        
+    except Exception as e:
+        logging.exception(f"Error retrying document: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
