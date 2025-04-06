@@ -30,10 +30,23 @@ function initDocumentBrowser() {
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     
     // Modals with null checks
-    const editDocumentModal = document.getElementById('editDocumentModal') ? 
-        new bootstrap.Modal(document.getElementById('editDocumentModal')) : null;
-    const collectionModal = document.getElementById('collectionModal') ? 
-        new bootstrap.Modal(document.getElementById('collectionModal')) : null;
+    // Modals with null checks
+    let editDocumentModal = null;
+    if (document.getElementById("editDocumentModal")) {
+        editDocumentModal = new bootstrap.Modal(document.getElementById("editDocumentModal"), {
+            backdrop: "static",
+            keyboard: false
+        });
+    }
+    
+    const collectionModal = document.getElementById("collectionModal") ? 
+        new bootstrap.Modal(document.getElementById("collectionModal")) : null;
+    const manageCollectionsModal = document.getElementById("manageCollectionsModal") ?
+        new bootstrap.Modal(document.getElementById("manageCollectionsModal")) : null;
+    const deleteConfirmModal = document.getElementById("deleteConfirmModal") ?
+        new bootstrap.Modal(document.getElementById("deleteConfirmModal")) : null;
+    const batchMoveModal = document.getElementById("batchMoveModal") ?
+        new bootstrap.Modal(document.getElementById("batchMoveModal")) : null;
     const manageCollectionsModal = document.getElementById('manageCollectionsModal') ?
         new bootstrap.Modal(document.getElementById('manageCollectionsModal')) : null;
     const deleteConfirmModal = document.getElementById('deleteConfirmModal') ?
@@ -137,23 +150,25 @@ function initDocumentBrowser() {
     }
     
     // Handle batch delete button
-    if (batchDeleteBtn) {
-        batchDeleteBtn.addEventListener('click', function() {
+    // Handle batch move button
+    if (batchMoveBtn && batchMoveModal) {
+        batchMoveBtn.addEventListener("click", function() {
             if (selectedDocuments.size === 0) return;
             
-            // Set up confirmation modal
-            deleteType = 'batch';
-            if (deleteConfirmMessage) {
-                deleteConfirmMessage.textContent = `Are you sure you want to delete ${selectedDocuments.size} selected document(s)? This action cannot be undone.`;
+            // Update collection dropdown
+            updateBatchMoveCollectionDropdown();
+            
+            // Update document count
+            if (batchMoveCount) {
+                batchMoveCount.textContent = selectedDocuments.size;
             }
-            if (deleteConfirmModal) {
-                deleteConfirmModal.show();
+            
+            // Show modal
+            if (batchMoveModal) {
+                batchMoveModal.show();
             }
         });
     }
-    
-    // Handle batch move save
-    if (batchMoveSaveButton && batchMoveCollection) {
         batchMoveSaveButton.addEventListener('click', function() {
             const collectionIdValue = batchMoveCollection.value;
             if (selectedDocuments.size === 0) return;
@@ -309,89 +324,105 @@ function initDocumentBrowser() {
         confirmDeleteButton.addEventListener('click', function() {
             if (deleteType === 'document' && deleteId) {
                 deleteDocument(deleteId);
-            } else if (deleteType === 'collection' && deleteId) {
-                deleteCollection(deleteId);
-            } else if (deleteType === 'batch') {
-                batchDeleteDocuments();
-            }
-            
-            // Close modal
-            if (deleteConfirmModal) {
-                deleteConfirmModal.hide();
-            }
-        });
-    }
-    
     // Handle document editing
-    if (editDocumentButton && editDocumentModal) {
-        editDocumentButton.addEventListener('click', function() {
+    if (editDocumentButton) {
+        editDocumentButton.addEventListener("click", function() {
             if (!currentDocumentId) return;
             
             // Find current document
             const doc = documents.find(d => d.id === currentDocumentId);
             if (!doc) return;
             
+            // Make sure collection dropdown is up to date
+            updateEditDocumentCollectionDropdown();
+            
             // Populate form
             if (editDocumentId) editDocumentId.value = doc.id;
-            if (editDocumentTitle) editDocumentTitle.value = doc.title || '';
-            if (editDocumentAuthors) editDocumentAuthors.value = doc.authors || '';
-            if (editDocumentJournal) editDocumentJournal.value = doc.journal || '';
-            if (editDocumentPublicationDate) editDocumentPublicationDate.value = doc.publication_date ? doc.publication_date.split('T')[0] : '';
-            if (editDocumentDOI) editDocumentDOI.value = doc.doi || '';
-            if (editDocumentTags) editDocumentTags.value = doc.tags ? doc.tags.join(', ') : '';
-            if (editDocumentCollection) editDocumentCollection.value = doc.collection_id || '';
+            if (editDocumentTitle) editDocumentTitle.value = doc.title || "";
+            if (editDocumentAuthors) editDocumentAuthors.value = doc.authors || "";
+            if (editDocumentJournal) editDocumentJournal.value = doc.journal || "";
+            if (editDocumentPublicationDate) editDocumentPublicationDate.value = doc.publication_date ? doc.publication_date.split("T")[0] : "";
+            if (editDocumentDOI) editDocumentDOI.value = doc.doi || "";
+            if (editDocumentTags) editDocumentTags.value = doc.tags ? doc.tags.join(", ") : "";
+            if (editDocumentCollection) {
+                // Set the correct collection value
+                editDocumentCollection.value = doc.collection_id || "";
+            }
             
             // Update citation preview
             updateCitationPreview();
             
             // Show modal
-            editDocumentModal.show();
+            if (editDocumentModal) {
+                editDocumentModal.show();
+            }
         });
     }
-
-    // Handle document view PDF (opens in new tab)
-    document.addEventListener('click', function(e) {
-        if (e.target.matches('.view-pdf-button') || e.target.closest('.view-pdf-button')) {
-            const button = e.target.matches('.view-pdf-button') ? e.target : e.target.closest('.view-pdf-button');
-            const documentId = button.dataset.id;
-            if (documentId) {
-                window.open(`/documents/view/${documentId}`, '_blank');
-            }
-        }
-    });
-    
+            if (editDocumentAuthors) editDocumentAuthors.value = doc.authors || '';
+            if (editDocumentJournal) editDocumentJournal.value = doc.journal || '';
+            if (editDocumentPublicationDate) editDocumentPublicationDate.value = doc.publication_date ? doc.publication_date.split('T')[0] : '';
+            if (editDocumentDOI) editDocumentDOI.value = doc.doi || '';
     // Handle document form submission
-    if (saveDocumentButton && editDocumentId && editDocumentTitle) {
-        saveDocumentButton.addEventListener('click', function() {
-            if (!editDocumentId.value) return;
+    if (saveDocumentButton) {
+        saveDocumentButton.addEventListener("click", function() {
+            if (!editDocumentId || !editDocumentId.value) {
+                console.error("Missing document ID for save operation");
+                return;
+            }
             
             // Validate form
-            if (!editDocumentTitle.value.trim()) {
-                showAlert('Document title is required', 'warning');
+            if (editDocumentTitle && !editDocumentTitle.value.trim()) {
+                showAlert("Document title is required", "warning");
                 return;
             }
             
             // Prepare data
             const data = {
-                title: editDocumentTitle.value.trim(),
-                authors: editDocumentAuthors ? editDocumentAuthors.value.trim() : '',
-                journal: editDocumentJournal ? editDocumentJournal.value.trim() : '',
+                title: editDocumentTitle ? editDocumentTitle.value.trim() : "",
+                authors: editDocumentAuthors ? editDocumentAuthors.value.trim() : "",
+                journal: editDocumentJournal ? editDocumentJournal.value.trim() : "",
                 publication_date: editDocumentPublicationDate ? editDocumentPublicationDate.value || null : null,
-                doi: editDocumentDOI ? editDocumentDOI.value.trim() : '',
+                doi: editDocumentDOI ? editDocumentDOI.value.trim() : "",
                 tags: editDocumentTags && editDocumentTags.value.trim() ? 
-                     editDocumentTags.value.split(',').map(tag => tag.trim()) : [],
-                collection_id: editDocumentCollection && editDocumentCollection.value === '' ? 
-                              null : (editDocumentCollection ? editDocumentCollection.value : null)
+                     editDocumentTags.value.split(",").map(tag => tag.trim()) : [],
+                collection_id: editDocumentCollection && editDocumentCollection.value ? 
+                              parseInt(editDocumentCollection.value) : null
             };
+            
+            // Log what we are sending for debugging
+            console.log("Saving document with data:", data);
             
             // Send request
             fetch(`/documents/api/documents/${editDocumentId.value}`, {
-                method: 'PUT',
+                method: "PUT",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify(data)
             })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    showAlert("Document updated successfully", "success");
+                    
+                    // Close modal
+                    if (editDocumentModal) {
+                        editDocumentModal.hide();
+                    }
+                    
+                    // Reload documents and show updated document
+                    loadDocuments();
+                } else {
+                    throw new Error(data.error || "Failed to update document");
+                }
+            })
+            .catch(error => {
+                console.error("Error saving document:", error);
+                showAlert("Error: " + error.message, "danger");
+            });
+        });
+    }
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -666,18 +697,8 @@ function initDocumentBrowser() {
         while (curr.parent_id !== null) {
             depth++;
             const parent = collections.find(c => c.id === curr.parent_id);
-            if (!parent) break;
-            curr = parent;
-        }
-        
-        return depth;
-    }
-    
-    /**
-     * Load collections data
-     */
     function loadCollections() {
-        fetch('/documents/api/collections')
+        fetch("/documents/api/collections")
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -694,12 +715,12 @@ function initDocumentBrowser() {
                     
                     // Populate collection filters
                     if (collectionFilter) {
-                        collectionFilter.innerHTML = '<option value="">All Collections</option>';
+                        collectionFilter.innerHTML = "<option value="">All Collections</option>";
                         
                         sortedCollections.forEach(coll => {
                             const depth = getCollectionDepth(coll);
-                            const prefix = '— '.repeat(depth);
-                            const option = document.createElement('option');
+                            const prefix = "— ".repeat(depth);
+                            const option = document.createElement("option");
                             option.value = coll.id;
                             option.textContent = prefix + coll.name;
                             if (coll.id === activeCollection) {
@@ -711,20 +732,51 @@ function initDocumentBrowser() {
                     
                     // Populate upload collection dropdown
                     if (uploadCollection) {
-                        uploadCollection.innerHTML = '<option value="">None</option>';
+                        uploadCollection.innerHTML = "<option value="">None</option>";
                         
                         sortedCollections.forEach(coll => {
                             const depth = getCollectionDepth(coll);
-                            const prefix = '— '.repeat(depth);
-                            const option = document.createElement('option');
+                            const prefix = "— ".repeat(depth);
+                    // Update the edit document modal and batch move modal dropdowns
+                    updateEditDocumentCollectionDropdown();
+                    updateBatchMoveCollectionDropdown();
                             option.value = coll.id;
                             option.textContent = prefix + coll.name;
                             uploadCollection.appendChild(option);
                         });
                     }
                     
-                    // Populate edit document collection dropdown
-                    if (editDocumentCollection) {
+                    // Update the edit document modal dropdown
+                    updateEditDocumentCollectionDropdown();
+                    
+                    // Populate collection parent dropdown
+                    if (collectionParent) {
+                        collectionParent.innerHTML = "<option value="">None (Root Collection)</option>";
+                        
+                        sortedCollections.forEach(coll => {
+                            // Skip current collection as it cant be its own parent
+                            if (collectionId && coll.id === collectionId.value) return;
+                            
+                            const depth = getCollectionDepth(coll);
+                            // Skip if depth > 1 to maintain max hierarchy depth of 3
+                            if (depth > 1) return;
+                            
+                            const prefix = "— ".repeat(depth);
+                            const option = document.createElement("option");
+                            option.value = coll.id;
+                            option.textContent = prefix + coll.name;
+                            collectionParent.appendChild(option);
+                        });
+                    }
+                } else {
+                    console.error("Failed to load collections:", data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error loading collections:", error);
+                showAlert("Error loading collections", "danger");
+            });
+    }
                         editDocumentCollection.innerHTML = '<option value="">None</option>';
                         
                         sortedCollections.forEach(coll => {
@@ -1558,4 +1610,67 @@ function debounce(func, wait) {
             func.apply(context, args);
         }, wait);
     };
+}
+
+/**
+ * Make sure the editDocumentCollection dropdown is properly populated when collections change
+ * This fixes the issue with tags and collection fields not being saved
+ */
+function updateEditDocumentCollectionDropdown() {
+    if (editDocumentCollection) {
+        // Clear existing options except the first one (None)
+        while (editDocumentCollection.options.length > 1) {
+            editDocumentCollection.remove(1);
+        }
+        
+        // Sort collections for display
+        const sortedCollections = [...collections].sort((a, b) => {
+            // Sort by parent_id (null first) then by name
+            if ((a.parent_id === null) !== (b.parent_id === null)) {
+                return (a.parent_id === null) ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        
+        // Add collection options
+        sortedCollections.forEach(coll => {
+            const depth = getCollectionDepth(coll);
+            const prefix = '— '.repeat(depth);
+            const option = document.createElement('option');
+            option.value = coll.id;
+            option.textContent = prefix + coll.name;
+            editDocumentCollection.appendChild(option);
+        });
+    }
+}
+
+/**
+ * Update the batch move modal collection dropdown
+ */
+function updateBatchMoveCollectionDropdown() {
+    if (batchMoveCollection) {
+        // Clear existing options except the first one (None)
+        while (batchMoveCollection.options.length > 1) {
+            batchMoveCollection.remove(1);
+        }
+        
+        // Sort collections for display
+        const sortedCollections = [...collections].sort((a, b) => {
+            // Sort by parent_id (null first) then by name
+            if ((a.parent_id === null) !== (b.parent_id === null)) {
+                return (a.parent_id === null) ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        
+        // Add collection options
+        sortedCollections.forEach(coll => {
+            const depth = getCollectionDepth(coll);
+            const prefix = '— '.repeat(depth);
+            const option = document.createElement('option');
+            option.value = coll.id;
+            option.textContent = prefix + coll.name;
+            batchMoveCollection.appendChild(option);
+        });
+    }
 }
