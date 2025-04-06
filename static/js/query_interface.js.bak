@@ -1,7 +1,7 @@
 /**
  * Initialize the query interface
  */
-window.initQueryInterface = function() {
+function initQueryInterface() {
     const queryForm = document.getElementById('queryForm');
     const queryInput = document.getElementById('queryInput');
     const conversationContainer = document.getElementById('conversationContainer');
@@ -101,7 +101,6 @@ window.initQueryInterface = function() {
                 }
                 
                 // Add each message to the conversation
-                // Add each message to the conversation
                 messages.forEach(message => {
                     if (message.role === 'user') {
                         addMessageToConversation('user', message.content);
@@ -122,6 +121,10 @@ window.initQueryInterface = function() {
                 if (messages.length > 0) {
                     conversationContainer.scrollTop = conversationContainer.scrollHeight;
                 }
+            })
+            .catch(error => {
+                console.error('Error loading conversation:', error);
+                conversationHistory.innerHTML = `
                     <div class="alert alert-danger">
                         <strong>Error loading conversation.</strong> Please try again.
                     </div>
