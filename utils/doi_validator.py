@@ -204,6 +204,58 @@ JOURNAL_DOI_PATTERNS = {
     )
 }
 
+def clean_known_journal_doi(doi):
+    """
+    Clean a DOI based on known journal patterns
+    This function handles known journal DOI formats with custom cleaning rules
+    
+    Args:
+        doi (str): The DOI to clean
+        
+    Returns:
+        str: Cleaned DOI that matches the expected format for the detected journal
+    """
+    if not doi:
+        return None
+        
+    # Journal of Rheumatology pattern (10.3899/jrheum.XXXXXX)
+    j_rheum_match = re.match(r'(10\.3899/jrheum\.\d{6})[A-Za-z]', doi)
+    if j_rheum_match:
+        return j_rheum_match.group(1)
+    
+    # Check if it's already a clean J Rheum DOI
+    if re.match(r'^10\.3899/jrheum\.\d{6}$', doi):
+        return doi
+        
+    # ARD journal pattern (10.1136/annrheumdis-YYYY-XXXXXX)
+    ard_match = re.match(r'(10\.\d{4}/annrheumdis-\d{4}-\d+)[A-Za-z]', doi)
+    if ard_match:
+        return ard_match.group(1)
+        
+    # Arthritis & Rheumatology (10.1002/art.XXXXX)
+    art_rheum_match = re.match(r'(10\.1002/art\.\d+)[A-Za-z]', doi)
+    if art_rheum_match:
+        return art_rheum_match.group(1)
+        
+    # For other journal patterns, remove any non-standard characters at the end
+    # First try to find a valid format from our known patterns
+    for journal_name, (patterns, _) in JOURNAL_DOI_PATTERNS.items():
+        for pattern in patterns:
+            # Convert the simple pattern to a regex that captures just the DOI part
+            # This handles the case where extra text is attached to a valid DOI
+            exact_match = re.match(f'({pattern})', doi)
+            if exact_match:
+                return exact_match.group(1)
+    
+    # If no specific journal pattern matched, apply general cleaning
+    # Remove common suffixes that might be attached
+    for suffix in ['First', 'Published', 'Article', 'Clinical', 'Full', 'Paper', 'Release', 'Online']:
+        if suffix in doi and not suffix.lower() in doi.lower()[:15]:  # Only if suffix is not part of actual DOI
+            return doi.split(suffix)[0]
+            
+    # If no specific cleaning was needed, return the original
+    return doi
+
 def extract_doi_from_text(text):
     """
     Extract DOI from text content using regex patterns
@@ -217,20 +269,40 @@ def extract_doi_from_text(text):
     if not text:
         return None
     
+    # Special handling for common journal patterns
+    # First check for specific journal content before doing general extraction
+    
+    # Look for Journal of Rheumatology DOIs specifically (most problematic case)
+    if "journal of rheumatology" in text.lower() or "j rheumatol" in text.lower():
+        # Specific pattern with careful boundary handling
+        j_rheum_match = re.search(r'(?:doi:?\s*|DOI:?\s*)(10\.3899/jrheum\.\d{6})(?:\b|\s|$|\.|\n|\\n)', text)
+        if j_rheum_match:
+            doi = j_rheum_match.group(1)
+            return clean_known_journal_doi(doi)
+            
+        # Try a more permissive pattern if the strict one fails
+        j_rheum_match = re.search(r'(?:doi:?\s*|DOI:?\s*)(10\.3899/jrheum\.\d{6})', text)
+        if j_rheum_match:
+            doi = j_rheum_match.group(1)
+            return clean_known_journal_doi(doi)
+    
     # Try to find DOI with 'doi:' prefix first (common in academic papers)
     match = re.search(DOI_WITH_PREFIX_REGEX, text, re.IGNORECASE)
     if match:
-        return match.group(1)
+        doi = match.group(1)
+        return clean_known_journal_doi(doi)
     
     # Try to find DOI with exact case (more strict)
     match = re.search(DOI_REGEX, text, re.IGNORECASE)
     if match:
-        return match.group(1)
+        doi = match.group(1)
+        return clean_known_journal_doi(doi)
     
     # Try with a more permissive pattern
     match = re.search(DOI_REGEX_CASE_INSENSITIVE, text, re.IGNORECASE)
     if match:
-        return match.group(1)
+        doi = match.group(1)
+        return clean_known_journal_doi(doi)
     
     return None
 
@@ -455,6 +527,59 @@ def extract_dois(text, max_chars=5000):
     
     return doi_candidates
 
+def preprocess_jrheum_doi(text):
+    """
+    Special preprocessing function specifically for Journal of Rheumatology DOIs
+    Handles the exact problematic case we've encountered with "First" suffix
+    
+    Args:
+        text (str): The text containing the DOI
+        
+    Returns:
+        str or None: The extracted and cleaned DOI, or None if not found
+    """
+    if not text:
+        return None
+    
+    # Try various patterns with explicit boundary handling
+    patterns = [
+        # Pattern 1: With doi: prefix and clean boundaries
+        r'doi:?\s*(10\.3899/jrheum\.\d{6})(?:\s|\n|$|\.)',  
+        
+        # Pattern 2: Without boundaries (for cases where formatting is lost)
+        r'doi:?\s*(10\.3899/jrheum\.\d{6})',
+        
+        # Pattern 3: Direct DOI without prefix
+        r'(?:^|\s)(10\.3899/jrheum\.\d{6})(?:\s|\n|$|\.)',
+        
+        # Pattern 4: Looking for DOI in the specific context from our problematic document
+        r'doi:?\s*(10\.3899/jrheum\.\d{6})(?:First|$|\s|\n)',
+        
+        # Pattern 5: Extremely specific pattern for our problem case
+        r'doi:?\s*(10\.3899/jrheum\.220209)(?:First|$|\s|\n)',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            doi = match.group(1)
+            logger.info(f"Extracted J Rheumatology DOI with special pattern: {doi}")
+            return doi
+    
+    # Try harder with a plain pattern and post-processing
+    plain_match = re.search(r'(10\.3899/jrheum\.\d{6})[A-Za-z]*', text)
+    if plain_match and plain_match.group(0):
+        # Just take the numerical part to avoid any suffixes
+        plain_doi = plain_match.group(0)
+        # Extract only the DOI pattern we know is valid
+        doi_match = re.match(r'(10\.3899/jrheum\.\d{6})', plain_doi)
+        if doi_match and doi_match.group(1):
+            doi = doi_match.group(1)
+            logger.info(f"Extracted J Rheumatology DOI with fallback pattern: {doi}")
+            return doi
+        
+    return None
+
 def extract_and_validate_doi(text):
     """
     Extract DOI from text and validate it with DOI.org and Crossref
@@ -468,12 +593,37 @@ def extract_and_validate_doi(text):
     """
     if not text:
         return None
-    
+        
+    # Special case: Check if it's a Journal of Rheumatology document (critical case)
+    if "Journal of Rheumatology" in text or "J Rheumatol" in text:
+        # Try our specialized preprocessor for J Rheumatology DOIs
+        jrheum_doi = preprocess_jrheum_doi(text)
+        if jrheum_doi:
+            logger.info(f"Using preprocessed J Rheumatology DOI: {jrheum_doi}")
+            if check_doi_exists(jrheum_doi):
+                metadata = validate_doi_with_crossref(jrheum_doi)
+                if metadata:
+                    return metadata
+                return {"DOI": jrheum_doi, "valid": True, "source": "doi.org"}
+                
+        # Try to find the specific format for J Rheumatology DOIs (fallback)
+        jrheum_match = re.search(r'doi:?\s*(10\.3899/jrheum\.\d{6})', text, re.IGNORECASE)
+        if jrheum_match:
+            doi = jrheum_match.group(1)
+            logger.info(f"Direct extraction of Journal of Rheumatology DOI: {doi}")
+            # Verify this DOI
+            if check_doi_exists(doi):
+                metadata = validate_doi_with_crossref(doi)
+                if metadata:
+                    return metadata
+                return {"DOI": doi, "valid": True, "source": "doi.org"}
+                
     # First try the simple extract_doi_from_text function for common cases
+    # This now uses our clean_known_journal_doi function for better cleaning
     doi = extract_doi_from_text(text)
     if doi:
-        # Remove any trailing punctuation
-        doi = re.sub(r'[,;.)\]"\'\s]+$', '', doi)
+        # Apply advanced cleaning
+        doi = clean_known_journal_doi(doi)
         
         # Check if this DOI is valid
         if check_doi_exists(doi):
@@ -488,20 +638,46 @@ def extract_and_validate_doi(text):
     # No DOIs found
     if not dois:
         return None
-        
+    
+    # Extremely specific handling for known problematic case
+    # Look for the exact pattern that causes the issue
+    if "Journal of Rheumatology" in text or "J Rheumatol" in text:
+        for doi in dois:
+            if "10.3899/jrheum" in doi:
+                # Match only the valid part of the DOI
+                jrheum_fixed = re.match(r'(10\.3899/jrheum\.\d{6})', doi)
+                if jrheum_fixed:
+                    clean_doi = jrheum_fixed.group(1)
+                    logger.info(f"Using exact J Rheumatology DOI pattern: {clean_doi}")
+                    if check_doi_exists(clean_doi):
+                        metadata = validate_doi_with_crossref(clean_doi)
+                        if metadata:
+                            return metadata
+                        return {"DOI": clean_doi, "valid": True, "source": "doi.org"}
+    
     # Try each candidate DOI until we find a valid one
     for doi in dois:
-        # Standard validation check
-        if check_doi_exists(doi):
-            metadata = validate_doi_with_crossref(doi)
+        # First apply the specific journal cleaning for better results
+        clean_doi = clean_known_journal_doi(doi)
+        
+        # Standard validation check with the cleaned DOI
+        if check_doi_exists(clean_doi):
+            metadata = validate_doi_with_crossref(clean_doi)
             if metadata:
                 return metadata
-            return {"DOI": doi, "valid": True, "source": "doi.org"}
+            return {"DOI": clean_doi, "valid": True, "source": "doi.org"}
         
-        # Special handling for known problematic DOIs
+        # Special handling for DOIs with "First" suffix (exact problem case)
+        if "First" in doi:
+            first_split = doi.split("First")[0]
+            if check_doi_exists(first_split):
+                metadata = validate_doi_with_crossref(first_split)
+                if metadata:
+                    return metadata
+                return {"DOI": first_split, "valid": True, "source": "doi.org"}
         
         # Case 1: Look for known journal DOI patterns with suffixes
-        j_rheum_match = re.match(r'(10\.3899/jrheum\.\d+)[A-Z]', doi)
+        j_rheum_match = re.match(r'(10\.3899/jrheum\.\d+)[A-Za-z]', doi)
         if j_rheum_match:
             clean_doi = j_rheum_match.group(1)
             logger.info(f"Trying cleaned J Rheumatology DOI: {clean_doi} (original: {doi})")
@@ -512,7 +688,7 @@ def extract_and_validate_doi(text):
                 return {"DOI": clean_doi, "valid": True, "source": "doi.org"}
         
         # Case 2: Common ARD journal DOI pattern with suffixes
-        ard_match = re.match(r'(10\.\d{4}/annrheumdis-\d{4}-\d+)[A-Z]', doi)
+        ard_match = re.match(r'(10\.\d{4}/annrheumdis-\d{4}-\d+)[A-Za-z]', doi)
         if ard_match:
             clean_doi = ard_match.group(1)
             logger.info(f"Trying cleaned ARD DOI: {clean_doi} (original: {doi})")
@@ -523,7 +699,7 @@ def extract_and_validate_doi(text):
                 return {"DOI": clean_doi, "valid": True, "source": "doi.org"}
         
         # Case 3: Try removing common suffixes that might be attached
-        for suffix in ['First', 'Published', 'Article', 'Clinical', 'Full', 'Paper']:
+        for suffix in ['First', 'Published', 'Article', 'Clinical', 'Full', 'Paper', 'Release', 'Online']:
             if suffix in doi and not suffix.lower() in doi.lower()[:15]:
                 clean_doi = doi.split(suffix)[0]
                 logger.info(f"Trying DOI without suffix: {clean_doi} (removed: {suffix})")
@@ -532,6 +708,18 @@ def extract_and_validate_doi(text):
                     if metadata:
                         return metadata
                     return {"DOI": clean_doi, "valid": True, "source": "doi.org"}
+    
+    # Last-resort direct pattern matching for common journal patterns
+    for journal_name, (patterns, _) in JOURNAL_DOI_PATTERNS.items():
+        for pattern in patterns:
+            direct_match = re.search(pattern, text, re.IGNORECASE)
+            if direct_match:
+                potential_doi = direct_match.group(0)
+                if check_doi_exists(potential_doi):
+                    metadata = validate_doi_with_crossref(potential_doi)
+                    if metadata:
+                        return metadata
+                    return {"DOI": potential_doi, "valid": True, "source": "doi.org"}
     
     # If we get here, we couldn't find a valid DOI even with special handling
     logger.warning(f"Failed to validate any DOI candidates: {dois}")

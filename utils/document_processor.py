@@ -318,6 +318,16 @@ def process_document(document_id):
                     document.doi = doi
                     logger.info(f"Extracted valid EULAR guideline DOI: {doi}")
         
+        # Special approach for Journal of Rheumatology
+        if not doi and ("Journal of Rheumatology" in text[:2000] or "J Rheumatol" in text[:2000]):
+            # Apply specialized Journal of Rheumatology DOI extraction
+            from utils.doi_validator import preprocess_jrheum_doi
+            jrheum_doi = preprocess_jrheum_doi(text[:5000])
+            if jrheum_doi and check_doi_exists(jrheum_doi):
+                doi = jrheum_doi
+                document.doi = doi
+                logger.info(f"Found Journal of Rheumatology DOI with specialized preprocessing: {doi}")
+                
         # If not found yet, use our extract_dois function to find potential DOIs
         if not doi:
             # Extract all DOI candidates from the document
@@ -332,6 +342,14 @@ def process_document(document_id):
                 if cleaned_doi and check_doi_exists(cleaned_doi):
                     valid_dois.append(cleaned_doi)
                     logger.info(f"Found valid DOI: {cleaned_doi}")
+                    
+                # Special handling for known problem DOIs
+                elif "First" in candidate and candidate.startswith("10."):
+                    # Try splitting at "First" (common in Journal of Rheumatology)
+                    parts = candidate.split("First")
+                    if parts and check_doi_exists(parts[0]):
+                        valid_dois.append(parts[0])
+                        logger.info(f"Found valid DOI by removing 'First' suffix: {parts[0]}")
             
             # Use the first valid DOI found
             if valid_dois:
