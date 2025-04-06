@@ -1,10 +1,17 @@
 # Backup Summary
 
 ## Local Backup
-- Created backup directory: ./backups/backup_20250405_005129
+- Created latest backup: ./backups/code_backup_20250406_025804
+- Database schema: ./backups/schema_backup_20250406_025806.sql
 - Includes all essential code files and application directories
 - Core files, routes, templates, static assets, and utilities backed up
-- Size of backup: 656K
+
+## Improvements in This Version
+- Enhanced DOI extraction for rheumatology journals
+- Added specialized preprocessing for Journal of Rheumatology DOIs
+- Fixed boundary issues in extracted DOIs (e.g., "10.3899/jrheum.220209First")
+- Implemented robust pattern matching with explicit checks for common suffixes
+- Added direct pattern matching for problematic cases
 
 ## GitHub Preparation
 - Updated README.md with latest features and information
