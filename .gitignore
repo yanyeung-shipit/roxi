@@ -1,8 +1,12 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -22,38 +26,28 @@ wheels/
 
 # Virtual environment
 venv/
-ENV/
 env/
+ENV/
 
-# Flask
-instance/
-.webassets-cache
-
-# Uploads and temporary files
-uploads/*
-!uploads/.gitkeep
-tmp/
-
-# Database
-*.db
-*.sqlite3
-
-# Environment variables
-.env
-
-# Logs
-logs/
-*.log
-
-# Editor specific files
+# IDE files
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Backups
-backups/
+# Flask stuff
+instance/
+.webassets-cache
 
-# System files
-.DS_Store
-Thumbs.db
+# Replit specific
+.replit
+.breakpoints
+replit.nix
+.upm/
+
+# Project-specific
+uploads/*
+!uploads/.gitkeep
+backups/*
+!backups/.gitkeep
+.env
