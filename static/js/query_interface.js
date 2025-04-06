@@ -106,8 +106,7 @@ function initQueryInterface() {
                 // Update the conversation title
                 conversationTitle.textContent = 'Conversation History';
                 
-                // Scroll to bottom
-                conversationContainer.scrollTop = conversationContainer.scrollHeight;
+                // No automatic scrolling - keep the view at the top
             })
             .catch(error => {
                 console.error('Error loading conversation:', error);
@@ -142,8 +141,7 @@ function initQueryInterface() {
         `;
         conversationHistory.appendChild(loadingElement);
         
-        // Scroll to loading message
-        conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        // No automatic scrolling - keep the view at the top
         
         // Send query to server
         fetch('/query', {
@@ -182,8 +180,7 @@ function initQueryInterface() {
                 addMessageToConversation('assistant', errorMessage);
             }
             
-            // Scroll to bottom
-            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+            // No automatic scrolling - keep the view at the top
         })
         .catch(error => {
             console.error('Error submitting query:', error);
@@ -199,8 +196,7 @@ function initQueryInterface() {
             `;
             addMessageToConversation('assistant', errorMessage);
             
-            // Scroll to bottom
-            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+            // No automatic scrolling - keep the view at the top
         });
     }
     
