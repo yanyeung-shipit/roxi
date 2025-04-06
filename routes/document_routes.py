@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request, send_from_directory, abort
+from flask import Blueprint, render_template, jsonify, request, send_from_directory, abort, Response
 import sqlalchemy as sa
 import os
 import shutil
@@ -6,9 +6,31 @@ import datetime
 import logging
 from app import db
 from models import Document, ProcessingQueue, TextChunk, VectorEmbedding, Collection
+from utils.auth import requires_auth
 
 # Create blueprint
 document_routes = Blueprint('documents', __name__, url_prefix='/documents')
+
+# Protect all document routes with authentication
+@document_routes.before_request
+def protect_all_document_routes():
+    """Apply authentication to all routes in this blueprint"""
+    # Skip the check for OPTIONS requests (CORS preflight)
+    if request.method == 'OPTIONS':
+        return None
+        
+    # Get authentication credentials from environment variables
+    admin_user = os.environ.get("ADMIN_USER", "admin")
+    admin_pass = os.environ.get("ADMIN_PASS", "roxi_admin")
+    
+    # Check if authentication is provided and valid
+    auth = request.authorization
+    if not auth or auth.username != admin_user or auth.password != admin_pass:
+        return Response(
+            'Authentication required to access this area',
+            401,
+            {'WWW-Authenticate': 'Basic realm="ROXI Admin Area"'}
+        )
 
 @document_routes.route('/')
 def document_browser():

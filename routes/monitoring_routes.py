@@ -1,12 +1,34 @@
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request, Response
 from datetime import datetime, timedelta
 import sqlalchemy as sa
+import os
 
 from app import db
 from models import SystemMetrics, ProcessingQueue, Document, TextChunk, VectorEmbedding
 
 # Create blueprint
 monitoring_routes = Blueprint('monitoring', __name__, url_prefix='/monitoring')
+
+# Protect all monitoring routes with authentication
+@monitoring_routes.before_request
+def protect_all_monitoring_routes():
+    """Apply authentication to all routes in this blueprint"""
+    # Skip the check for OPTIONS requests (CORS preflight)
+    if request.method == 'OPTIONS':
+        return None
+        
+    # Get authentication credentials from environment variables
+    admin_user = os.environ.get("ADMIN_USER", "admin")
+    admin_pass = os.environ.get("ADMIN_PASS", "roxi_admin")
+    
+    # Check if authentication is provided and valid
+    auth = request.authorization
+    if not auth or auth.username != admin_user or auth.password != admin_pass:
+        return Response(
+            'Authentication required to access this area',
+            401,
+            {'WWW-Authenticate': 'Basic realm="ROXI Admin Area"'}
+        )
 
 @monitoring_routes.route('/')
 def monitoring_dashboard():
