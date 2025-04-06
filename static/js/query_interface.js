@@ -261,12 +261,26 @@ function addMessageToConversation(role, message, citations = []) {
         // Assistant message with possible citations
         let formattedMessage = message;
         
+        // Use markdown-it to render markdown if available
+        if (window.markdownit) {
+            const md = window.markdownit({
+                html: false,
+                linkify: true,
+                typographer: true,
+                highlight: function (str, lang) {
+                    return `<pre><code>${escapeHtml(str)}</code></pre>`;
+                }
+            });
+            formattedMessage = md.render(message);
+        }
+        
         // Format citations if available
         if (citations && citations.length > 0) {
-            // List citations at the end
+            // List citations at the end with numbering
             const citationList = citations.map((citation, index) => {
                 return `
                     <div class="citation-details mt-2">
+                        <div class="citation-number"><strong>[${index + 1}]</strong></div>
                         <div class="citation-text">${citation.citation || 'Citation not available'}</div>
                         <div class="citation-snippet mt-1">
                             <small class="text-muted">"${citation.snippet || '...'}"</small>
@@ -297,4 +311,41 @@ function addMessageToConversation(role, message, citations = []) {
     
     // Return the message element for reference
     return messageElement;
+}
+
+/**
+ * Escape HTML characters
+ */
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+/**
+ * Show an alert message
+ */
+function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alertContainer');
+    if (!alertContainer) return;
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    alertContainer.appendChild(alert);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        alert.classList.remove('show');
+        setTimeout(() => {
+            alertContainer.removeChild(alert);
+        }, 150);
+    }, 5000);
 }

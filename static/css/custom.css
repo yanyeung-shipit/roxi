@@ -169,6 +169,13 @@
     border-radius: 0.25rem;
     background-color: rgba(0, 0, 0, 0.15);
     margin-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.citation-number {
+    margin-bottom: 0.25rem;
+    color: var(--bs-primary);
 }
 
 .citation-title {
@@ -214,4 +221,46 @@
     margin-top: 4rem;
     padding-top: 1.5rem;
     padding-bottom: 1.5rem;
+}
+
+/* Add support for markdown rendering */
+.assistant-message h1, .assistant-message h2, .assistant-message h3, 
+.assistant-message h4, .assistant-message h5, .assistant-message h6 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.assistant-message h2 {
+    font-size: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.3rem;
+}
+
+.assistant-message h3 {
+    font-size: 1.25rem;
+}
+
+.assistant-message ul, .assistant-message ol {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.assistant-message li {
+    margin-bottom: 0.25rem;
+}
+
+.assistant-message strong {
+    color: var(--bs-primary);
+}
+
+.assistant-message p {
+    margin-bottom: 0.75rem;
+}
+
+.assistant-message blockquote {
+    border-left: 3px solid var(--bs-gray-600);
+    padding-left: 0.75rem;
+    margin-left: 0;
+    font-style: italic;
 }

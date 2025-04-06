@@ -51,7 +51,7 @@ def generate_answer_with_gpt(query, context_chunks, model="gpt-4o"):
         formatted_chunks = []
         for i, chunk in enumerate(context_chunks):
             doc = chunk.document
-            chunk_header = f"Document {i+1}: \"{doc.title or 'Untitled'}\" "
+            chunk_header = f"Source {i+1}: \"{doc.title or 'Untitled'}\" "
             if doc.authors:
                 chunk_header += f"by {doc.authors}"
             formatted_chunks.append(f"{chunk_header}\n\n{chunk.text}")
@@ -66,17 +66,21 @@ RULES:
 1. Answer questions based ONLY on the context provided.
 2. If the context doesn't contain enough information, say "Based on the available documents, I don't have enough information to fully answer that question." Then share what partial information you do have.
 3. Use academic, professional language appropriate for medical research.
-4. When referencing information, include document numbers like [Document 1], [Document 2], etc.
+4. When referencing information, include only the number in square brackets like [1], [2], etc. (not [Document 1]).
 5. Be precise with medical terminology. Don't simplify or generalize technical concepts.
 6. For treatments, always specify if the information relates to diagnosis, monitoring, or treatment recommendations.
 7. For medical findings, clearly indicate the strength of evidence if mentioned in the documents.
 8. Do not recall information outside of the provided context, even if you know it to be factually correct.
 
 FORMAT YOUR RESPONSE:
+- Use proper Markdown formatting including:
+  * Headings (## and ### for sections and subsections)
+  * Bullet points or numbered lists where appropriate
+  * Bold text for important information
 - Start with a direct answer to the question
 - Follow with detailed explanations from the documents
-- Include document references [Document X] for each key point
-- If the question asks about multiple aspects, organize your response with headings"""
+- Include reference numbers [1], [2], etc. after each key point
+- If the question asks about multiple aspects, organize your response with clear headings"""
         
         # Create messages for the API call
         messages = [
