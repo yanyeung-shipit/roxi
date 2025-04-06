@@ -309,8 +309,8 @@ def process_document(document_id):
             logger.info(f"Detected possible EULAR guideline document: {document_id}")
             
             # For EULAR guidelines, try to find any ARD journal DOIs first
-            from utils.doi_validator import ARD_DOI_REGEX
-            eular_doi_match = re.search(ARD_DOI_REGEX, text[:5000])
+            ard_pattern = r'(10\.\d{4}/annrheumdis-\d{4}-\d+)'
+            eular_doi_match = re.search(ard_pattern, text[:5000])
             if eular_doi_match:
                 doi = eular_doi_match.group(1)
                 doi = clean_doi(doi)  # Apply our DOI cleaning to be safe

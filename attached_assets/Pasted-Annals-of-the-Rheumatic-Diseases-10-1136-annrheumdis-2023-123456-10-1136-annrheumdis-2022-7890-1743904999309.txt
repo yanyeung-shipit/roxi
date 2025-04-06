@@ -1,0 +1,211 @@
+Annals of the Rheumatic Diseases
+
+10.1136/annrheumdis-2023-123456
+
+10.1136/annrheumdis-2022-789012
+
+10.1136/ard.50.1.8
+
+10.1136/annrheumdis-2022-222145
+
+10.1136/annrheumdis-2019-215647
+
+Arthritis & Rheumatology
+
+10.1002/art.42567
+
+10.1002/art.56789
+
+10.1002/art.41747
+
+10.1002/art.41280
+
+10.1002/art.39311
+
+Nature Reviews Rheumatology
+
+10.1038/s41584-023-00976-8
+
+10.1038/s41584-022-00543
+
+10.1038/nrrheum.2010.7
+
+10.1038/nrrheum.2009.250
+
+10.1038/nrrheum.2010.6
+
+Rheumatology (Oxford)
+
+10.1093/rheumatology/kead123
+
+10.1093/rheumatology/keae456
+
+Seminars in Arthritis and Rheumatism
+
+10.1016/j.semarthrit.2023.152234
+
+10.1016/j.semarthrit.2022.142345
+
+10.1016/j.semarthrit.2011.01.008
+
+10.1016/s0049-0172(04)00234-3
+
+10.1016/s0049-0172(17)30275-5
+
+Journal of Rheumatology
+
+10.3899/jrheum.220123
+
+10.3899/jrheum.210456
+
+Clinical and Experimental Rheumatology
+
+10.55563/cer.2023.1234
+
+10.55563/cer.2022.5678
+
+Current Opinion in Rheumatology
+
+10.1097/BOR.0000000000001234
+
+10.1097/BOR.0000000000005678
+
+Arthritis Research & Therapy
+
+10.1186/s13075-023-03123-6
+
+10.1186/s13075-022-02876-5
+
+Scandinavian Journal of Rheumatology
+
+10.1080/03009742.2023.1234567
+
+10.1080/03009742.2022.7654321
+
+Best Practice & Research Clinical Rheumatology
+
+10.1016/j.berh.2023.101876
+
+10.1016/j.berh.2022.101765
+
+Lupus
+
+10.1177/09612033231123456
+
+10.1177/09612033221098765
+
+Osteoarthritis and Cartilage
+
+10.1016/j.joca.2023.03.123
+
+10.1016/j.joca.2022.12.456
+
+Journal of Clinical Rheumatology
+
+10.1097/RHU-23-4567
+
+10.1097/RHU-22-1234
+
+Arthritis Care & Research
+
+10.1002/acr.25067
+
+10.1002/acr.24012
+
+Rheumatology (Oxford)
+
+10.1093/rheumatology/2.6.217
+
+10.1093/rheumatology/x.6.270
+
+10.1093/rheumatology/keu087.001
+
+Rheumatology International
+
+10.1007/s00296-023-05345-1
+
+10.1007/s00296-022-05212-3
+
+Modern Rheumatology
+
+10.1080/14397595.2023.123456
+
+10.1080/14397595.2022.654321
+
+Pediatric Rheumatology
+
+10.1186/s12969-023-00844-5
+
+10.1186/s12969-022-00722-6
+
+BMC Musculoskeletal Disorders
+
+10.1186/s12891-023-06723-0
+
+10.1186/s12891-022-05953-1
+
+Open Rheumatology Journal
+
+10.2174/1874312902014010123
+
+10.2174/1874312901912010456
+
+Clinical Rheumatology
+
+10.1007/s10067-023-06617-5
+
+10.1007/s10067-022-06123-6
+
+Reumatología Clínica
+
+10.1016/j.reuma.2023.123456
+
+10.1016/j.reuma.2022.654321
+
+International Journal of Rheumatology
+
+10.1155/2023/1234567
+
+10.1155/2022/7654321
+
+Journal of Autoimmunity
+
+10.1016/j.jaut.2023.103123
+
+10.1016/j.jaut.2022.102456
+
+Autoimmunity Reviews
+
+10.1016/j.autrev.2023.103456
+
+10.1016/j.autrev.2022.102789
+
+Journal of Scleroderma and Related Disorders
+
+10.1177/23971983231123456
+
+10.1177/23971983221098765
+
+RMD Open
+
+10.1136/rmdopen-2023-003456
+
+10.1136/rmdopen-2022-002345
+
+Arthritis & Rheumatology Reports
+
+10.1002/arr2.12345
+
+10.1002/arr2.67890
+
+Journal of Inflammation Research
+
+10.2147/JIR.S123456
+
+10.2147/JIR.S654321
+
+Therapeutic Advances in Musculoskeletal Disease
+
+10.1177/1759720X231234567
+
+10.1177/1759720X221987654
