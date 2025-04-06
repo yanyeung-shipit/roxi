@@ -294,11 +294,13 @@ def process_document(document_id):
         # Store the full text in the document
         document.full_text = text
         
-        # Try to extract raw doi from text
+        # Try to extract DOI from the document text
         import re
         doi = None
-        # Look for DOI in first 2000 characters (usually contains citation info)
-        text_sample = text[:2000]
+        
+        # Use our improved DOI extraction and validation functions
+        from utils.doi_validator import extract_dois, check_doi_exists, extract_and_validate_doi
+        from fix_dois import clean_doi
         
         # Check if this is potentially a EULAR guideline document based on title or content
         is_eular_guideline = False
@@ -306,37 +308,38 @@ def process_document(document_id):
             is_eular_guideline = True
             logger.info(f"Detected possible EULAR guideline document: {document_id}")
             
-            # EULAR guidelines often have ARD journal DOIs with specific pattern
+            # For EULAR guidelines, try to find any ARD journal DOIs first
             from utils.doi_validator import ARD_DOI_REGEX
             eular_doi_match = re.search(ARD_DOI_REGEX, text[:5000])
             if eular_doi_match:
                 doi = eular_doi_match.group(1)
-                document.doi = doi
-                logger.info(f"Extracted EULAR guideline DOI: {doi}")
-        
-        # Try standard DOI extraction if not already found
-        if not doi:
-            from utils.doi_validator import DOI_WITH_PREFIX_REGEX, DOI_REGEX
-            
-            # First try with prefix (most reliable)
-            doi_match = re.search(DOI_WITH_PREFIX_REGEX, text_sample, re.IGNORECASE)
-            if doi_match:
-                doi = doi_match.group(1)
-                # Clean the DOI immediately to remove any unwanted suffixes
-                from fix_dois import clean_doi
-                doi = clean_doi(doi)
-                document.doi = doi
-                logger.info(f"Extracted DOI with prefix: {doi}")
-            else:
-                # Try without prefix
-                doi_match = re.search(DOI_REGEX, text_sample, re.IGNORECASE)
-                if doi_match:
-                    doi = doi_match.group(1)
-                    # Clean the DOI immediately to remove any unwanted suffixes
-                    from fix_dois import clean_doi
-                    doi = clean_doi(doi)
+                doi = clean_doi(doi)  # Apply our DOI cleaning to be safe
+                if check_doi_exists(doi):
                     document.doi = doi
-                    logger.info(f"Extracted DOI without prefix: {doi}")
+                    logger.info(f"Extracted valid EULAR guideline DOI: {doi}")
+        
+        # If not found yet, use our extract_dois function to find potential DOIs
+        if not doi:
+            # Extract all DOI candidates from the document
+            logger.info(f"Searching for DOIs in document {document_id}...")
+            doi_candidates = extract_dois(text[:5000])  # Search in first 5000 chars
+            
+            valid_dois = []
+            # Check each candidate DOI
+            for candidate in doi_candidates:
+                # Clean each DOI
+                cleaned_doi = clean_doi(candidate)
+                if cleaned_doi and check_doi_exists(cleaned_doi):
+                    valid_dois.append(cleaned_doi)
+                    logger.info(f"Found valid DOI: {cleaned_doi}")
+            
+            # Use the first valid DOI found
+            if valid_dois:
+                doi = valid_dois[0]
+                document.doi = doi
+                logger.info(f"Using DOI: {doi} for document {document_id}")
+            else:
+                logger.info(f"No valid DOIs found in document {document_id}")
         
         # If we have a DOI, try to validate with Crossref and PubMed
         metadata = None
@@ -362,7 +365,7 @@ def process_document(document_id):
             # Try to extract title directly
             if document.title and "_" in document.title and not " " in document.title:
                 # Looks like a filename, try to find a better title
-                title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text_sample)
+                title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text[:2000])
                 
                 # Special handling for EULAR documents (common in rheumatology)
                 eular_patterns = [
@@ -388,26 +391,26 @@ def process_document(document_id):
                         
                 # Fall back to standard title extraction if no EULAR pattern matched
                 if not title_match and document.title and "_" in document.title:
-                    title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text_sample)
+                    title_match = re.search(r'(?:title|TITLE):?\s*([^\.]+?)(?:\n|\.)', text[:2000])
                     
                 if title_match and document.title and "_" in document.title:
                     document.title = clean_text(title_match.group(1).strip())
             
             # Try to extract authors
-            author_match = re.search(r'((?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+(?:,|;|\s+and|\s+&)\s+)+(?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+))', text_sample)
+            author_match = re.search(r'((?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+(?:,|;|\s+and|\s+&)\s+)+(?:[A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-zA-Z]+))', text[:2000])
             if author_match and not document.authors:
                 document.authors = author_match.group(1).strip()
             
             # Try to extract journal
-            journal_match = re.search(r'(?:journal|JOURNAL):?\s*([^\.]+?)(?:\n|\.)', text_sample)
+            journal_match = re.search(r'(?:journal|JOURNAL):?\s*([^\.]+?)(?:\n|\.)', text[:2000])
             if not journal_match:
                 # Common journal abbreviations
-                journal_match = re.search(r'(?:Ann(?:als)?\.?\s+(?:of\s+)?Rheum(?:atic)?\s+Dis(?:eases)?|Arthritis\s+Rheum(?:atology)?|J(?:ournal)?\s+Rheumatol(?:ogy)?)', text_sample)
+                journal_match = re.search(r'(?:Ann(?:als)?\.?\s+(?:of\s+)?Rheum(?:atic)?\s+Dis(?:eases)?|Arthritis\s+Rheum(?:atology)?|J(?:ournal)?\s+Rheumatol(?:ogy)?)', text[:2000])
             if journal_match and not document.journal:
                 document.journal = journal_match.group(0).strip()
             
             # Try to extract year
-            year_match = re.search(r'\((\d{4})\)', text_sample)
+            year_match = re.search(r'\((\d{4})\)', text[:2000])
             if year_match and not document.publication_date:
                 year = int(year_match.group(1))
                 document.publication_date = datetime.datetime(year, 1, 1)

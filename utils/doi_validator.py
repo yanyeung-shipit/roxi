@@ -6,22 +6,19 @@ logger = logging.getLogger(__name__)
 
 # Regular expression for DOI pattern
 # Format: 10.NNNN/any_characters_here
-# Note: We're careful about capturing parentheses in the DOI and ensuring proper word boundaries
-# Opening parentheses are allowed in the middle, but not capturing closing parentheses at the end
-# We also make sure not to capture words that may follow the DOI like "Recommendation", "Article", "Clinical", etc.
+# Using a simpler approach to ensure we capture DOIs correctly
 
-# Improved pattern to more strictly match DOI format and avoid appending words like "Clinical"
-# Core DOI pattern: 10.NNNN/suffix with careful handling of word boundaries
-# The key improvement is adding more specific patterns to handle capitalized words that might be appended
+# Base DOI pattern - simpler but effective approach
+DOI_REGEX = r'(10\.\d{4,9}/[-._;()/:A-Za-z0-9]+)'
 
-# Base DOI pattern, with strict word boundary handling
-DOI_REGEX = r'(10\.\d{4,9}/[-._;\(\)/:A-Z0-9-]+?)(?:[^a-zA-Z0-9\-\._\/]|$|(?=[A-Z][a-z]+))'
+# Same pattern but stored for case insensitive searches
+DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;()/:A-Za-z0-9]+)'
 
-# Case-insensitive version for more permissive matching
-DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:[^a-zA-Z0-9\-\._\/]|$|(?=[A-Z][a-z]+))'
+# DOI with prefix pattern
+DOI_WITH_PREFIX_REGEX = r'(?:doi|DOI):?\s*(10\.\d{4,9}/[-._;()/:A-Za-z0-9]+)'
 
-# Format with 'doi:' prefix, using the same boundary handling
-DOI_WITH_PREFIX_REGEX = r'doi:?\s*(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:[^a-zA-Z0-9\-\._\/]|$|(?=[A-Z][a-z]+))'
+# DOI in URL format (common in PDFs)
+DOI_URL_REGEX = r'https?://(?:dx\.)?doi\.org/(10\.\d{4,9}/[-._;()/:A-Za-z0-9]+)'
 
 # Additional specific pattern for Annals of the Rheumatic Diseases journal DOIs
 ARD_DOI_REGEX = r'(10\.\d{4}/annrheumdis-\d{4}-\d+)'
@@ -135,10 +132,63 @@ def validate_doi_with_crossref(doi):
         logger.exception(f"Error validating DOI: {doi}")
         return None
 
+def extract_dois(text, max_chars=5000):
+    """
+    Extract all potential DOI candidates from a text using a simpler, more direct approach.
+    
+    Args:
+        text (str): The text to search for DOIs
+        max_chars (int): Maximum characters to search through
+        
+    Returns:
+        list: List of potential DOI candidates
+    """
+    if not text:
+        return []
+    
+    # Limit the text length to avoid excessive processing
+    text_sample = text[:max_chars]
+    
+    # List to store all found DOIs
+    doi_candidates = []
+    
+    # Search using all our patterns
+    patterns = [
+        DOI_REGEX,                   # Base DOI pattern
+        DOI_WITH_PREFIX_REGEX,       # DOI with prefix (doi:)
+        DOI_URL_REGEX,               # DOI in URL form
+        ARD_DOI_REGEX,               # Special ARD journal pattern
+        r'(?:10\.\d{4,9}/\S{4,})'    # More permissive pattern as fallback
+    ]
+    
+    for pattern in patterns:
+        matches = re.finditer(pattern, text_sample, re.IGNORECASE)
+        for match in matches:
+            # Get the DOI from the first capturing group or the entire match
+            doi = match.group(1) if match.lastindex else match.group(0)
+            
+            # Clean the DOI
+            doi = doi.strip()
+            
+            # Remove any trailing punctuation
+            doi = re.sub(r'[,;.)\]"\'\s]+$', '', doi)
+            
+            # Some DOIs might have words attached at the end
+            # Split at any capital letter followed by lowercase (CamelCase boundary)
+            doi_parts = re.split(r'(?<=[a-z0-9])(?=[A-Z][a-z])', doi)
+            if doi_parts:
+                doi = doi_parts[0]
+            
+            # Add to candidates if not already there
+            if doi and doi not in doi_candidates and doi.startswith('10.'):
+                doi_candidates.append(doi)
+    
+    return doi_candidates
+
 def extract_and_validate_doi(text):
     """
     Extract DOI from text and validate it with DOI.org and Crossref
-    Uses multiple extraction patterns and validation methods
+    Uses a simpler, more direct approach to find DOIs
     
     Args:
         text (str): The text to extract DOI from
@@ -148,69 +198,34 @@ def extract_and_validate_doi(text):
     """
     if not text:
         return None
-        
-    # Strategy 1: Extract with standard pattern and validate
+    
+    # First try the simple extract_doi_from_text function for common cases
     doi = extract_doi_from_text(text)
     if doi:
-        metadata = validate_doi_with_crossref(doi)
-        if metadata:
-            return metadata
-            
-    # Strategy 2: Try more aggressive extraction for the first 5000 chars
-    # This looks for anything that might be a DOI in a larger chunk of text
-    sample = text[:5000]
-    
-    # Common DOI prefixes we might find
-    patterns = [
-        # With 'doi:' prefix
-        r'doi:?\s*(10\.\d{4,9}/[^\s\)\]\"\']+)',
-        # Without prefix, just looking for the DOI pattern
-        r'(?<!\w)(10\.\d{4,9}/[^\s\)\]\"\']+)',
-        # DOI in URL format
-        r'https?://doi\.org/(10\.\d{4,9}/[^\s\)\]\"\']+)',
-        # Specific pattern for Annals of Rheumatic Diseases (ARD) journal
-        r'(10\.\d{4}/ard-\d{4}-\d+)[^\d]',
-        # Another common ARD pattern 
-        r'(10\.\d{4}/annrheumdis-\d{4}-\d+)[^\d]'
-    ]
-    
-    for pattern in patterns:
-        matches = re.finditer(pattern, sample, re.IGNORECASE)
-        for match in matches:
-            candidate_doi = match.group(1)
-            # Check this candidate DOI
-            if check_doi_exists(candidate_doi):
-                # It exists, try to get metadata
-                metadata = validate_doi_with_crossref(candidate_doi)
-                if metadata:
-                    return metadata
-                # If we can't get metadata but DOI exists, return minimal info
-                return {"DOI": candidate_doi, "valid": True, "source": "doi.org"}
-    
-    # Try searching for DOI reference explicitly mentioned
-    doi_ref_pattern = r'(?:doi|DOI)[\s:]*(10\.\d{4,9}/\S+)'
-    match = re.search(doi_ref_pattern, text)
-    if match:
-        # Extract just the DOI part without trailing punctuation
-        candidate_doi = re.sub(r'[,;\.\)\]\"\']+$', '', match.group(1))
-        # Further clean the DOI - specifically look for common patterns in rheumatology papers
-        # Remove words like "Recommendation", "Article", etc. that might be appended to the DOI
-        if "Recommendation" in candidate_doi:
-            candidate_doi = candidate_doi.split("Recommendation")[0]
-        elif "Article" in candidate_doi:
-            candidate_doi = candidate_doi.split("Article")[0]
+        # Remove any trailing punctuation
+        doi = re.sub(r'[,;.)\]"\'\s]+$', '', doi)
         
-        # Specific handling for EULAR guidelines DOIs which often have this pattern
-        ard_pattern = r'(10\.\d{4}/ard-\d{4}-\d+)'
-        ard_match = re.search(ard_pattern, candidate_doi)
-        if ard_match:
-            candidate_doi = ard_match.group(1)
-            
-        if check_doi_exists(candidate_doi):
-            metadata = validate_doi_with_crossref(candidate_doi)
+        # Check if this DOI is valid
+        if check_doi_exists(doi):
+            metadata = validate_doi_with_crossref(doi)
             if metadata:
                 return metadata
-            return {"DOI": candidate_doi, "valid": True, "source": "doi.org"}
+            return {"DOI": doi, "valid": True, "source": "doi.org"}
+    
+    # Try the more comprehensive extraction method
+    dois = extract_dois(text, max_chars=5000)
+    
+    # No DOIs found
+    if not dois:
+        return None
+        
+    # Try each candidate DOI until we find a valid one
+    for doi in dois:
+        if check_doi_exists(doi):
+            metadata = validate_doi_with_crossref(doi)
+            if metadata:
+                return metadata
+            return {"DOI": doi, "valid": True, "source": "doi.org"}
     
     # If we get here, we couldn't find a valid DOI
     return None
