@@ -11,6 +11,7 @@ from utils.document_processor import process_document_job
 from utils.pdf_processor import save_uploaded_pdf
 from utils.embeddings import search_similar_chunks
 from utils.citation_generator import format_citation_for_response
+from utils.openai_utils import generate_answer_with_gpt
 
 logger = logging.getLogger(__name__)
 
@@ -141,11 +142,10 @@ def query():
         # Search for similar chunks
         similar_chunks = search_similar_chunks(query_text, top_k=5)
         
-        # TODO: In a real RAG system, we would fetch these chunks and use an LLM to generate a response
-        # For demonstration, we'll return a canned response with real citations
-        
         # Get chunk texts and documents
         citations = []
+        chunks = []
+        
         if similar_chunks:
             from models import TextChunk
             
@@ -167,9 +167,14 @@ def query():
                 citation['snippet'] = chunk.text[:150] + "..." if len(chunk.text) > 150 else chunk.text
                 citations.append(citation)
         
-        # Store the query and response in history
-        response_text = "This is a placeholder response for your query. In a real RAG system, the retrieved document chunks would be sent to an LLM to generate a coherent answer."
+        # Generate response using GPT-4o based on retrieved chunks
+        if chunks:
+            logger.info(f"Generating answer with GPT-4o for query: {query_text}")
+            response_text = generate_answer_with_gpt(query_text, chunks)
+        else:
+            response_text = "I couldn't find any relevant information about your query in the database. Please try rephrasing your question or upload more documents related to this topic."
         
+        # Store the query and response in history
         query_history = QueryHistory(
             query_text=query_text,
             response=response_text,

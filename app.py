@@ -28,6 +28,14 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max upload size
 
+# Check for OpenAI API key
+openai_api_key = os.environ.get("OPENAI_API_KEY")
+if openai_api_key:
+    app.config["OPENAI_API_KEY"] = openai_api_key
+    logger.info("OpenAI API key found. GPT-4o integration is available.")
+else:
+    logger.warning("OpenAI API key not found. GPT-4o integration will not be available.")
+
 # Ensure upload directory exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
