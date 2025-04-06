@@ -57,7 +57,7 @@ def _make_request(url: str, params: Dict[str, Any]) -> Optional[requests.Respons
     
     # Adding tool and email parameters as recommended by NCBI
     params['tool'] = 'ROXI-Rheumatology'
-    params['email'] = 'noreply@example.com'  # Replace with a real email in production
+    params['email'] = 'rheum.reviews@gmail.com'
     
     try:
         response = requests.get(url, params=params)

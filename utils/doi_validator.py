@@ -326,7 +326,7 @@ def check_doi_exists(doi):
         # Try to resolve the DOI through the central DOI resolver
         headers = {
             'Accept': 'application/json',
-            'User-Agent': 'ROXI/0.1 (mailto:contact@example.com)'
+            'User-Agent': 'ROXI/0.1 (mailto:rheum.reviews@gmail.com)'
         }
         response = requests.head(f"https://doi.org/{doi}", 
                                headers=headers, 
@@ -366,7 +366,7 @@ def validate_doi_with_crossref(doi):
         
         # Send request to Crossref API
         response = requests.get(url, timeout=10, headers={
-            'User-Agent': 'ROXI/0.1 (mailto:contact@example.com)'
+            'User-Agent': 'ROXI/0.1 (mailto:rheum.reviews@gmail.com)'
         })
         
         # Check if request was successful

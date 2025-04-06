@@ -42,6 +42,12 @@ if openai_api_key:
 else:
     logger.warning("OpenAI API key not found. GPT-4o integration will not be available.")
 
+# Configure PubMed API integration
+from utils.pubmed_integration import set_api_key as set_pubmed_api_key
+# Use default settings with the provided email
+app.config["PUBMED_EMAIL"] = "rheum.reviews@gmail.com"
+logger.info(f"PubMed API configured with email: {app.config['PUBMED_EMAIL']}")
+
 # Ensure upload directory exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
