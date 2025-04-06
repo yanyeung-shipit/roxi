@@ -930,7 +930,7 @@ function initDocumentBrowser() {
             .then(data => {
                 if (data.success) {
                     documents = data.documents || [];
-                    totalPages = data.total_pages || 1;
+                    totalPages = data.pages || 1;
                     
                     // Update document count
                     if (documentCount) {

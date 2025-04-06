@@ -115,7 +115,9 @@ def list_documents():
         return jsonify({
             'success': True,
             'total': paginated.total,
+            'total_documents': paginated.total,  # For clarity in the frontend
             'pages': paginated.pages,
+            'total_pages': paginated.pages,     # For backward compatibility
             'current_page': page,
             'per_page': per_page,
             'has_next': paginated.has_next,
