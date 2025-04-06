@@ -10,9 +10,11 @@ function initQueryInterface() {
     const newConversationBtn = document.getElementById('newConversationBtn');
     
     if (!queryForm) return;
-    
     // Current conversation ID
     let currentConversationId = null;
+    
+    // Track if this is the first query in the conversation
+    let isFirstQuery = true;
     
     // Initialize a new conversation
     initConversation();
@@ -44,6 +46,8 @@ function initQueryInterface() {
     function initConversation() {
         // Generate a new conversation ID
         currentConversationId = generateConversationId();
+        // Reset first query tracking
+        isFirstQuery = true;
         
         // Reset the query input
         queryInput.value = '';
@@ -104,9 +108,14 @@ function initQueryInterface() {
                 });
                 
                 // Update the conversation title
+                // After first query, mark subsequent queries for scrolling
+                isFirstQuery = false;
                 conversationTitle.textContent = 'Conversation History';
                 
-                // No automatic scrolling - keep the view at the top
+        // Only scroll to bottom on follow-up queries
+        if (!isFirstQuery) {
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
             })
             .catch(error => {
                 console.error('Error loading conversation:', error);
@@ -141,7 +150,10 @@ function initQueryInterface() {
         `;
         conversationHistory.appendChild(loadingElement);
         
-        // No automatic scrolling - keep the view at the top
+        // Only scroll to bottom on follow-up queries
+        if (!isFirstQuery) {
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
         
         // Send query to server
         fetch('/query', {
@@ -169,6 +181,8 @@ function initQueryInterface() {
                 }
                 
                 // Update the conversation title
+                // After first query, mark subsequent queries for scrolling
+                isFirstQuery = false;
                 conversationTitle.textContent = 'Conversation';
             } else {
                 // Show error message
@@ -178,9 +192,14 @@ function initQueryInterface() {
                     </div>
                 `;
                 addMessageToConversation('assistant', errorMessage);
+                // After first query, mark subsequent queries for scrolling
+                isFirstQuery = false;
             }
             
-            // No automatic scrolling - keep the view at the top
+        // Only scroll to bottom on follow-up queries
+        if (!isFirstQuery) {
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
         })
         .catch(error => {
             console.error('Error submitting query:', error);
@@ -195,8 +214,13 @@ function initQueryInterface() {
                 </div>
             `;
             addMessageToConversation('assistant', errorMessage);
+                // After first query, mark subsequent queries for scrolling
+                isFirstQuery = false;
             
-            // No automatic scrolling - keep the view at the top
+        // Only scroll to bottom on follow-up queries
+        if (!isFirstQuery) {
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
         });
     }
     
