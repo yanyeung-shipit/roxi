@@ -297,8 +297,8 @@ def process_document(document_id):
         # Try to extract raw doi from text
         import re
         doi = None
-        # Look for DOI in first 1000 characters (usually contains citation info)
-        text_sample = text[:1000]
+        # Look for DOI in first 2000 characters (usually contains citation info)
+        text_sample = text[:2000]
         
         # Check if this is potentially a EULAR guideline document based on title or content
         is_eular_guideline = False
@@ -307,7 +307,8 @@ def process_document(document_id):
             logger.info(f"Detected possible EULAR guideline document: {document_id}")
             
             # EULAR guidelines often have ARD journal DOIs with specific pattern
-            eular_doi_match = re.search(r'(10\.\d{4}/ard-\d{4}-\d+)', text[:5000])
+            from utils.doi_validator import ARD_DOI_REGEX
+            eular_doi_match = re.search(ARD_DOI_REGEX, text[:5000])
             if eular_doi_match:
                 doi = eular_doi_match.group(1)
                 document.doi = doi
@@ -315,11 +316,27 @@ def process_document(document_id):
         
         # Try standard DOI extraction if not already found
         if not doi:
-            from utils.doi_validator import DOI_WITH_PREFIX_REGEX
+            from utils.doi_validator import DOI_WITH_PREFIX_REGEX, DOI_REGEX
+            
+            # First try with prefix (most reliable)
             doi_match = re.search(DOI_WITH_PREFIX_REGEX, text_sample, re.IGNORECASE)
             if doi_match:
                 doi = doi_match.group(1)
+                # Clean the DOI immediately to remove any unwanted suffixes
+                from fix_dois import clean_doi
+                doi = clean_doi(doi)
                 document.doi = doi
+                logger.info(f"Extracted DOI with prefix: {doi}")
+            else:
+                # Try without prefix
+                doi_match = re.search(DOI_REGEX, text_sample, re.IGNORECASE)
+                if doi_match:
+                    doi = doi_match.group(1)
+                    # Clean the DOI immediately to remove any unwanted suffixes
+                    from fix_dois import clean_doi
+                    doi = clean_doi(doi)
+                    document.doi = doi
+                    logger.info(f"Extracted DOI without prefix: {doi}")
         
         # If we have a DOI, try to validate with Crossref and PubMed
         metadata = None

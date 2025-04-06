@@ -8,11 +8,23 @@ logger = logging.getLogger(__name__)
 # Format: 10.NNNN/any_characters_here
 # Note: We're careful about capturing parentheses in the DOI and ensuring proper word boundaries
 # Opening parentheses are allowed in the middle, but not capturing closing parentheses at the end
-# We also make sure not to capture words that may follow the DOI like "Recommendation", "Article", etc.
-DOI_REGEX = r'(10\.\d{4,9}/[-._;\(\)/:A-Z0-9-]+?)(?:\s+[A-Z][a-z]+|\s|\)|$|[^\w\-\.;/\(\)])'
-DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:\s+[A-Z][a-z]+|\s|\)|$|[^\w\-\.;/\(\)])'
-# Format with 'doi:' prefix
-DOI_WITH_PREFIX_REGEX = r'doi:?\s*(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:\s+[A-Z][a-z]+|\s|\)|$|[^\w\-\.;/\(\)])'
+# We also make sure not to capture words that may follow the DOI like "Recommendation", "Article", "Clinical", etc.
+
+# Improved pattern to more strictly match DOI format and avoid appending words like "Clinical"
+# Core DOI pattern: 10.NNNN/suffix with careful handling of word boundaries
+# The key improvement is adding more specific patterns to handle capitalized words that might be appended
+
+# Base DOI pattern, with strict word boundary handling
+DOI_REGEX = r'(10\.\d{4,9}/[-._;\(\)/:A-Z0-9-]+?)(?:[^a-zA-Z0-9\-\._\/]|$|(?=[A-Z][a-z]+))'
+
+# Case-insensitive version for more permissive matching
+DOI_REGEX_CASE_INSENSITIVE = r'(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:[^a-zA-Z0-9\-\._\/]|$|(?=[A-Z][a-z]+))'
+
+# Format with 'doi:' prefix, using the same boundary handling
+DOI_WITH_PREFIX_REGEX = r'doi:?\s*(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)(?:[^a-zA-Z0-9\-\._\/]|$|(?=[A-Z][a-z]+))'
+
+# Additional specific pattern for Annals of the Rheumatic Diseases journal DOIs
+ARD_DOI_REGEX = r'(10\.\d{4}/annrheumdis-\d{4}-\d+)'
 
 def extract_doi_from_text(text):
     """

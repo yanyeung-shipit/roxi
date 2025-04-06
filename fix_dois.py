@@ -18,14 +18,16 @@ logger = logging.getLogger(__name__)
 
 # Common patterns to fix DOIs
 DOI_CLEANUP_PATTERNS = [
-    # Pattern for incorrectly attached words
-    (r'(10\.\d{4}/[^A-Z\s]+)([A-Z][a-z]+)', r'\1'),
+    # Pattern for incorrectly attached capitalized words - handles cases like "10.1136/annrheumdis-2017-211138Clinical"
+    (r'(10\.\d{4,9}/[-._;\(\)/:a-zA-Z0-9-]+?)([A-Z][a-z]+(?:[A-Z][a-z]+)*)', r'\1'),
     # Remove any whitespace in DOIs
-    (r'(10\.\d{4}/\S*)\s+(\S*)', r'\1\2'),
+    (r'(10\.\d{4,9}/\S*)\s+(\S*)', r'\1\2'),
     # Fix common typos in DOI prefixes
-    (r'10,(\d{4}/)', r'10.\1'),
+    (r'10,(\d{4,9}/)', r'10.\1'),
     # Remove trailing punctuation
-    (r'(10\.\d{4}/[^.,;:]+)[.,;:]', r'\1'),
+    (r'(10\.\d{4,9}/[^.,;:]+)[.,;:]', r'\1'),
+    # Specific pattern for Annals of the Rheumatic Diseases DOIs (common in rheumatology)
+    (r'(10\.\d{4}/annrheumdis-\d{4}-\d+)[^\d].*', r'\1'),
 ]
 
 def clean_doi(doi):
@@ -40,12 +42,23 @@ def clean_doi(doi):
         cleaned_doi = re.sub(pattern, replacement, cleaned_doi)
     
     # Check if the doi has any common suffixes that need to be removed
-    common_suffixes = ['Recommendation', 'Article', 'Published', 'ePub']
+    common_suffixes = [
+        'Recommendation', 'Article', 'Published', 'ePub', 
+        'Clinical', 'Trial', 'Abstract', 'Letter', 'Review',
+        'Guideline', 'Report', 'Study', 'Analysis', 'Paper'
+    ]
     for suffix in common_suffixes:
         if suffix in cleaned_doi:
             # Split at the suffix and take the first part
             parts = cleaned_doi.split(suffix)
             cleaned_doi = parts[0]
+    
+    # Further cleanup for special journal patterns
+    if 'annrheumdis' in cleaned_doi.lower():
+        # Try to extract just the ARD journal pattern
+        ard_match = re.search(r'(10\.\d{4}/annrheumdis-\d{4}-\d+)', cleaned_doi)
+        if ard_match:
+            cleaned_doi = ard_match.group(1)
     
     return cleaned_doi.strip()
 
