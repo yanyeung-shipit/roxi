@@ -106,7 +106,15 @@ function initQueryInterface() {
                 // Update the conversation title
                 conversationTitle.textContent = 'Conversation History';
                 
-                // We don't scroll - let the user see the beginning of the conversation
+                // Scroll to show the latest user query at the top
+                if (conversationContainer) {
+                    const userMessages = document.querySelectorAll('.user-message');
+                    if (userMessages.length > 0) {
+                        const lastUserMessage = userMessages[userMessages.length - 1];
+                        // Position the latest query at the top of the visible area
+                        conversationContainer.scrollTop = lastUserMessage.offsetTop - 20;
+                    }
+                }
             })
             .catch(error => {
                 console.error('Error loading conversation:', error);
@@ -123,7 +131,13 @@ function initQueryInterface() {
      */
     function submitQuery(query) {
         // Add user message to conversation
-        addMessageToConversation('user', query);
+        const userMessageElement = addMessageToConversation('user', query);
+        
+        // Scroll to show the user's query at the top
+        if (conversationContainer && userMessageElement) {
+            // Position the message at the top of the visible area
+            conversationContainer.scrollTop = userMessageElement.offsetTop - 20;
+        }
         
         // Clear query input
         queryInput.value = '';
@@ -140,8 +154,6 @@ function initQueryInterface() {
             </div>
         `;
         conversationHistory.appendChild(loadingElement);
-        
-        // We don't scroll - let the user see their most recent query at the top
         
         // Send query to server
         fetch('/query', {
@@ -170,6 +182,12 @@ function initQueryInterface() {
                 
                 // Update the conversation title
                 conversationTitle.textContent = 'Conversation';
+                
+                // Maintain the scroll position to keep showing the user query
+                if (conversationContainer && userMessageElement) {
+                    // Position the user message at the top again after the answer is loaded
+                    conversationContainer.scrollTop = userMessageElement.offsetTop - 20;
+                }
             } else {
                 // Show error message
                 const errorMessage = `
@@ -179,8 +197,6 @@ function initQueryInterface() {
                 `;
                 addMessageToConversation('assistant', errorMessage);
             }
-            
-            // We don't scroll - let the user see their most recent query at the top
         })
         .catch(error => {
             console.error('Error submitting query:', error);
@@ -195,8 +211,6 @@ function initQueryInterface() {
                 </div>
             `;
             addMessageToConversation('assistant', errorMessage);
-            
-            // We don't scroll - let the user see their most recent query at the top
         });
     }
     
@@ -213,7 +227,7 @@ function initQueryInterface() {
  */
 function addMessageToConversation(role, message, citations = []) {
     const conversationHistory = document.getElementById('conversationHistory');
-    if (!conversationHistory) return;
+    if (!conversationHistory) return null;
     
     // Clear any placeholder content
     if (conversationHistory.innerHTML.includes('ROXI can make mistakes')) {
@@ -270,4 +284,7 @@ function addMessageToConversation(role, message, citations = []) {
     
     // Add to conversation history
     conversationHistory.appendChild(messageElement);
+    
+    // Return the message element for reference
+    return messageElement;
 }
