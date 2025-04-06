@@ -309,31 +309,17 @@ def process_document(document_id):
             # EULAR guidelines often have ARD journal DOIs with specific pattern
             eular_doi_match = re.search(r'(10\.\d{4}/ard-\d{4}-\d+)', text[:5000])
             if eular_doi_match:
-                candidate_doi = eular_doi_match.group(1)
-                # Check if this DOI already exists in another document
-                existing_doc = Document.query.filter(Document.doi == candidate_doi, Document.id != document_id).first()
-                if existing_doc:
-                    logger.warning(f"DOI {candidate_doi} already exists in document {existing_doc.id} (filename: {existing_doc.filename})")
-                    raise ValueError(f"Duplicate DOI detected: {candidate_doi}. Already exists in document ID {existing_doc.id}")
-                else:
-                    doi = candidate_doi
-                    document.doi = doi
-                    logger.info(f"Extracted EULAR guideline DOI: {doi}")
+                doi = eular_doi_match.group(1)
+                document.doi = doi
+                logger.info(f"Extracted EULAR guideline DOI: {doi}")
         
         # Try standard DOI extraction if not already found
         if not doi:
             from utils.doi_validator import DOI_WITH_PREFIX_REGEX
             doi_match = re.search(DOI_WITH_PREFIX_REGEX, text_sample, re.IGNORECASE)
             if doi_match:
-                candidate_doi = doi_match.group(1)
-                # Check if this DOI already exists in another document
-                existing_doc = Document.query.filter(Document.doi == candidate_doi, Document.id != document_id).first()
-                if existing_doc:
-                    logger.warning(f"DOI {candidate_doi} already exists in document {existing_doc.id} (filename: {existing_doc.filename})")
-                    raise ValueError(f"Duplicate DOI detected: {candidate_doi}. Already exists in document ID {existing_doc.id}")
-                else:
-                    doi = candidate_doi
-                    document.doi = doi
+                doi = doi_match.group(1)
+                document.doi = doi
         
         # If we have a DOI, try to validate with Crossref and PubMed
         metadata = None
@@ -412,15 +398,7 @@ def process_document(document_id):
         # Update document metadata if DOI validation succeeded
         elif metadata:
             # Update document with metadata from Crossref or other source
-            candidate_doi = metadata.get('DOI')
-            if candidate_doi:
-                # Check if this DOI already exists in another document
-                existing_doc = Document.query.filter(Document.doi == candidate_doi, Document.id != document_id).first()
-                if existing_doc:
-                    logger.warning(f"DOI {candidate_doi} already exists in document {existing_doc.id} (filename: {existing_doc.filename})")
-                    raise ValueError(f"Duplicate DOI detected: {candidate_doi}. Already exists in document ID {existing_doc.id}")
-                else:
-                    document.doi = candidate_doi
+            document.doi = metadata.get('DOI')
             
             # Get title
             title = metadata.get('title')

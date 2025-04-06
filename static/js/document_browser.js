@@ -141,27 +141,13 @@ function initDocumentBrowser() {
         batchDeleteBtn.addEventListener('click', function() {
             if (selectedDocuments.size === 0) return;
             
-            // Set up batch delete modal
-            if (document.getElementById("batchDeleteCount")) {
-                document.getElementById("batchDeleteCount").textContent = selectedDocuments.size;
+            // Set up confirmation modal
+            deleteType = 'batch';
+            if (deleteConfirmMessage) {
+                deleteConfirmMessage.textContent = `Are you sure you want to delete ${selectedDocuments.size} selected document(s)? This action cannot be undone.`;
             }
-            
-            // Show batch delete modal
-            const batchDeleteModal = document.getElementById('batchDeleteModal') ?
-                new bootstrap.Modal(document.getElementById('batchDeleteModal')) : null;
-            if (batchDeleteModal) {
-                batchDeleteModal.show();
-            }
-        });
-    }
-    
-    // Handle confirm batch delete button
-    if (confirmBatchDeleteButton) {
-        confirmBatchDeleteButton.addEventListener('click', function() {
-            batchDeleteDocuments();
-            const batchDeleteModal = bootstrap.Modal.getInstance(document.getElementById('batchDeleteModal'));
-            if (batchDeleteModal) {
-                batchDeleteModal.hide();
+            if (deleteConfirmModal) {
+                deleteConfirmModal.show();
             }
         });
     }
@@ -1020,7 +1006,7 @@ function initDocumentBrowser() {
             }
             
             card.innerHTML = `
-                <div class="document-title"><strong>${doc.title || 'Untitled Document'}</strong></div>
+                <div class="document-title">${doc.title || 'Untitled Document'}</div>
                 <div class="document-authors">${doc.authors || 'Unknown authors'}</div>
                 <div class="document-date">${formattedDate}</div>
                 ${tagsHtml}

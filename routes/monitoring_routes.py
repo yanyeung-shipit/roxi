@@ -122,52 +122,6 @@ def get_processing_queue():
         'recent_queue': recent_entries
     })
 
-@monitoring_routes.route('/document_status/<int:document_id>')
-def get_document_status(document_id):
-    """
-    API endpoint to get processing status of a specific document
-    """
-    try:
-        # Check if document exists
-        document = Document.query.get(document_id)
-        if not document:
-            return jsonify({
-                'success': False,
-                'error': 'Document not found'
-            }), 404
-            
-        # Get the queue entry for this document
-        queue_entry = ProcessingQueue.query.filter_by(document_id=document_id).order_by(ProcessingQueue.queued_at.desc()).first()
-        
-        if not queue_entry:
-            # No queue entry found
-            if document.processed:
-                return jsonify({
-                    'success': True,
-                    'status': 'completed',
-                    'document_id': document_id
-                })
-            else:
-                return jsonify({
-                    'success': True,
-                    'status': 'unknown',
-                    'document_id': document_id
-                })
-        
-        # Return queue entry status and error message if any
-        return jsonify({
-            'success': True,
-            'status': queue_entry.status,
-            'document_id': document_id,
-            'error_message': queue_entry.error_message
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
 @monitoring_routes.route('/stats')
 def get_system_stats():
     """
