@@ -35,6 +35,8 @@ def match_to_predefined_tags(text_content, tag_candidates=None):
     Returns:
         list: List of matched predefined tags
     """
+    import re  # Explicitly import re to use regex for boundary checking
+    
     # Define dictionaries needed for tag generation and classification
     # Common rheumatology disease categories
     diseases = {
@@ -104,10 +106,14 @@ def match_to_predefined_tags(text_content, tag_candidates=None):
     # Initialize result tags and tag scores
     matched_tags = []
     tag_scores = {}
+    paragraph_cooccurrence = {}  # Track which terms co-occur in paragraphs
     
     # If tag candidates are provided, check if any match our predefined tags
     if tag_candidates and isinstance(tag_candidates, list):
         for candidate in tag_candidates:
+            if not isinstance(candidate, str):
+                continue
+                
             # Direct match (case insensitive)
             candidate_lower = candidate.lower()
             
@@ -125,35 +131,71 @@ def match_to_predefined_tags(text_content, tag_candidates=None):
                 # Check disease categories
                 for disease, keywords in diseases.items():
                     for keyword in keywords:
-                        if keyword.lower() in candidate_lower:
-                            if disease not in matched_tags:
-                                matched_tags.append(disease)
-                                # Score based on how much of the term matched
-                                tag_scores[disease] = tag_scores.get(disease, 0) + 5
-                            break
+                        # Improved matching with boundary checking for short keywords
+                        if len(keyword) <= 3:
+                            # For short terms, use word boundary regex
+                            pattern = r'\b' + re.escape(keyword.lower().strip()) + r'\b'
+                            if re.search(pattern, candidate_lower):
+                                if disease not in matched_tags:
+                                    matched_tags.append(disease)
+                                    # Score based on how much of the term matched
+                                    tag_scores[disease] = tag_scores.get(disease, 0) + 5
+                                break
+                        else:
+                            # For longer terms, use contains check
+                            if keyword.lower() in candidate_lower:
+                                if disease not in matched_tags:
+                                    matched_tags.append(disease)
+                                    # Score based on how much of the term matched
+                                    tag_scores[disease] = tag_scores.get(disease, 0) + 5
+                                break
                 
                 # Check document types
                 for doc_type, keywords in document_types.items():
                     for keyword in keywords:
-                        if keyword.lower() in candidate_lower:
-                            if doc_type not in matched_tags:
-                                matched_tags.append(doc_type)
-                                # Score based on how much of the term matched
-                                tag_scores[doc_type] = tag_scores.get(doc_type, 0) + 5
-                            break
+                        # Improved matching with boundary checking for short keywords
+                        if len(keyword) <= 3:
+                            # For short terms, use word boundary regex
+                            pattern = r'\b' + re.escape(keyword.lower().strip()) + r'\b'
+                            if re.search(pattern, candidate_lower):
+                                if doc_type not in matched_tags:
+                                    matched_tags.append(doc_type)
+                                    # Score based on how much of the term matched
+                                    tag_scores[doc_type] = tag_scores.get(doc_type, 0) + 5
+                                break
+                        else:
+                            # For longer terms, use contains check
+                            if keyword.lower() in candidate_lower:
+                                if doc_type not in matched_tags:
+                                    matched_tags.append(doc_type)
+                                    # Score based on how much of the term matched
+                                    tag_scores[doc_type] = tag_scores.get(doc_type, 0) + 5
+                                break
     
     # If text content is provided, search for mentions of predefined tags
     if text_content and isinstance(text_content, str):
         text_lower = text_content.lower()
         
+        # Split text into paragraphs for context-aware matching
+        paragraphs = re.split(r'\n\n|\r\n\r\n', text_lower)
+        
+        # First, find matches in the entire document
         # Search for disease terms
         for disease, keywords in diseases.items():
             # Initialize score for this disease
             current_score = 0
             
             for term in keywords:
-                # Count occurrences of the term
-                count = text_lower.count(term.lower())
+                # Improved matching with boundary checking for short terms
+                if len(term) <= 3:
+                    # For short terms, use word boundary regex
+                    pattern = r'\b' + re.escape(term.lower().strip()) + r'\b'
+                    matches = re.finditer(pattern, text_lower)
+                    count = sum(1 for _ in matches)
+                else:
+                    # For longer terms, use the existing count method
+                    count = text_lower.count(term.lower())
+                    
                 if count > 0:
                     # Add to the score
                     current_score += count * 2
@@ -169,8 +211,16 @@ def match_to_predefined_tags(text_content, tag_candidates=None):
             current_score = 0
             
             for term in keywords:
-                # Count occurrences
-                count = text_lower.count(term.lower())
+                # Improved matching with boundary checking for short terms
+                if len(term) <= 3:
+                    # For short terms, use word boundary regex
+                    pattern = r'\b' + re.escape(term.lower().strip()) + r'\b'
+                    matches = re.finditer(pattern, text_lower)
+                    count = sum(1 for _ in matches)
+                else:
+                    # For longer terms, use the existing count method
+                    count = text_lower.count(term.lower())
+                    
                 if count > 0:
                     # Add to the score
                     current_score += count * 2
@@ -179,12 +229,156 @@ def match_to_predefined_tags(text_content, tag_candidates=None):
             if current_score >= 5 and doc_type not in matched_tags:
                 matched_tags.append(doc_type)
                 tag_scores[doc_type] = current_score
+        
+        # Now analyze paragraph-level co-occurrences
+        for i, paragraph in enumerate(paragraphs):
+            if len(paragraph) < 10:  # Skip very short paragraphs
+                continue
+                
+            # Find which disease terms occur in this paragraph
+            paragraph_diseases = []
+            for disease, keywords in diseases.items():
+                for term in keywords:
+                    # Use boundary checking for short terms
+                    if len(term) <= 3:
+                        pattern = r'\b' + re.escape(term.lower().strip()) + r'\b'
+                        if re.search(pattern, paragraph):
+                            paragraph_diseases.append(disease)
+                            break
+                    else:
+                        if term.lower() in paragraph:
+                            paragraph_diseases.append(disease)
+                            break
+            
+            # Find which document types occur in this paragraph
+            paragraph_doc_types = []
+            for doc_type, keywords in document_types.items():
+                for term in keywords:
+                    # Use boundary checking for short terms
+                    if len(term) <= 3:
+                        pattern = r'\b' + re.escape(term.lower().strip()) + r'\b'
+                        if re.search(pattern, paragraph):
+                            paragraph_doc_types.append(doc_type)
+                            break
+                    else:
+                        if term.lower() in paragraph:
+                            paragraph_doc_types.append(doc_type)
+                            break
+            
+            # Record co-occurrences in this paragraph
+            all_paragraph_tags = paragraph_diseases + paragraph_doc_types
+            for tag in all_paragraph_tags:
+                if tag not in paragraph_cooccurrence:
+                    paragraph_cooccurrence[tag] = 1
+                else:
+                    paragraph_cooccurrence[tag] += 1
+                    
+                # Give bonus points for terms that appear in the same paragraph
+                if tag in tag_scores:
+                    tag_scores[tag] += 2
     
     # Sort tags by score (most relevant first)
     sorted_tags = sorted(matched_tags, key=lambda tag: tag_scores.get(tag, 0), reverse=True)
     
+    # Apply validation to filter implausible tag combinations
+    validated_tags = validate_tag_combinations(sorted_tags, tag_scores, text_content)
+    
     # Return the most relevant tags (limit to 6)
-    return sorted_tags[:6]
+    return validated_tags[:6]
+
+def validate_tag_combinations(tags, tag_scores, text_content=None):
+    """
+    Validate tag combinations to filter out implausible combinations and ensure essential tags aren't missed.
+    
+    Args:
+        tags (list): List of candidate tags, sorted by relevance
+        tag_scores (dict): Dictionary of tag scores for each tag
+        text_content (str, optional): The original text content for additional checking
+        
+    Returns:
+        list: Validated and filtered tag list
+    """
+    import re
+    
+    if not tags:
+        return tags
+        
+    # Check 1: Implausible vasculitis combinations
+    # If more than one specific vasculitis tag is present without strong evidence, keep only the highest-scored one
+    vasculitis_types = [
+        "Takayasu", "Polyarteritis Nodosa", "GCA", "GPA", "MPA", "EGPA", 
+        "Immune-Complex Vasculitis", "IgA Vasculitis", "Urticarial Vasculitis",
+        "Anti-GBM", "Cryo"
+    ]
+    
+    present_vasculitis = [tag for tag in tags if tag in vasculitis_types]
+    if len(present_vasculitis) > 1:
+        # Check if they appear together in the text (strong evidence)
+        has_strong_evidence = False
+        if text_content:
+            text_lower = text_content.lower()
+            # Look for phrases that mention multiple vasculitis types explicitly together
+            for i in range(len(present_vasculitis)):
+                for j in range(i+1, len(present_vasculitis)):
+                    tag1 = present_vasculitis[i].lower()
+                    tag2 = present_vasculitis[j].lower()
+                    
+                    # Check if both types are mentioned in the same sentence
+                    nearby_pattern = f"({tag1}[^.!?]{{0,100}}{tag2})|({tag2}[^.!?]{{0,100}}{tag1})"
+                    if re.search(nearby_pattern, text_lower):
+                        has_strong_evidence = True
+                        break
+        
+        # If no strong evidence, keep only the highest scored one
+        if not has_strong_evidence:
+            # Sort by score and keep only the top vasculitis tag
+            sorted_vasculitis = sorted(
+                present_vasculitis, 
+                key=lambda x: tag_scores.get(x, 0),
+                reverse=True
+            )
+            # Remove all but the highest-scored vasculitis tag
+            for tag in sorted_vasculitis[1:]:
+                tags.remove(tag)
+    
+    # Check 2: Ensure strong title matches aren't missing
+    # For example, if "rheumatoid arthritis" is in the title but missing from tags
+    if text_content:
+        # Common high-confidence title patterns that should definitely be tagged
+        high_confidence_patterns = {
+            "Rheumatoid Arthritis": r"\b(rheumatoid arthritis|ra patients)\b",
+            "Guideline": r"\b(guideline|guidelines|recommendations)\b",
+            "Clinical Trial": r"\b(clinical trial|randomized|randomised)\b"
+        }
+        
+        # Extract the first 300 chars which likely include the title
+        title_text = text_content[:300].lower()
+        
+        for tag, pattern in high_confidence_patterns.items():
+            if re.search(pattern, title_text, re.IGNORECASE) and tag not in tags:
+                # This is a high-confidence tag from the title - add it with a high score
+                tags.insert(0, tag)  # Insert at the beginning as it's high-confidence
+                tag_scores[tag] = 90  # High score but below exact match (100)
+    
+    # Check 3: Ensure disease-specific guidelines have the disease tag
+    if "Guideline" in tags:
+        guideline_disease_patterns = {
+            "Rheumatoid Arthritis": r"\b(rheumatoid arthritis|ra)\s+(?:guideline|recommendation)",
+            "Psoriatic Arthritis": r"\b(psoriatic arthritis|psa)\s+(?:guideline|recommendation)",
+            "Systemic Lupus Erythematosus": r"\b(lupus|sle)\s+(?:guideline|recommendation)",
+            "Osteoarthritis": r"\b(osteoarthritis|oa)\s+(?:guideline|recommendation)",
+            "Gout": r"\b(gout)\s+(?:guideline|recommendation)"
+        }
+        
+        if text_content:
+            for disease, pattern in guideline_disease_patterns.items():
+                if re.search(pattern, text_content[:1000], re.IGNORECASE) and disease not in tags:
+                    # This is a disease-specific guideline - ensure the disease is tagged
+                    tags.insert(1, disease)  # Insert after Guideline
+                    tag_scores[disease] = 85
+                    break
+    
+    return tags
 
 logger = logging.getLogger(__name__)
 
