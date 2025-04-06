@@ -5,6 +5,7 @@ import os
 
 from app import db
 from models import SystemMetrics, ProcessingQueue, Document, TextChunk, VectorEmbedding
+from utils.embeddings import regenerate_all_embeddings
 
 # Create blueprint
 monitoring_routes = Blueprint('monitoring', __name__, url_prefix='/monitoring')
@@ -184,3 +185,29 @@ def get_system_stats():
         'embeddings_percentage': round(embeddings_percentage, 1),
         'avg_processing_time_seconds': avg_processing_time
     })
+    
+@monitoring_routes.route('/regenerate-embeddings', methods=['POST'])
+def regenerate_embeddings():
+    """
+    Admin endpoint to regenerate all embeddings using the improved algorithm
+    
+    This will:
+    1. Delete all existing embeddings
+    2. Regenerate embeddings for all text chunks using the improved algorithm
+    3. Return statistics about the process
+    """
+    try:
+        # Regenerate embeddings
+        results = regenerate_all_embeddings()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Successfully regenerated {results.get('success', 0)} embeddings",
+            'results': results
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

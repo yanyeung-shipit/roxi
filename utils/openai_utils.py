@@ -47,29 +47,51 @@ def generate_answer_with_gpt(query, context_chunks, model="gpt-4o"):
         return "OpenAI integration is not properly configured. Please check your API key."
     
     try:
-        # Format context for the prompt
-        context_text = "\n\n---\n\n".join([chunk.text for chunk in context_chunks])
+        # Format context with document identifiers
+        formatted_chunks = []
+        for i, chunk in enumerate(context_chunks):
+            doc = chunk.document
+            chunk_header = f"Document {i+1}: \"{doc.title or 'Untitled'}\" "
+            if doc.authors:
+                chunk_header += f"by {doc.authors}"
+            formatted_chunks.append(f"{chunk_header}\n\n{chunk.text}")
         
-        # Prepare the system message with instructions
-        system_message = f"""You are ROXI (Rheumatology Optimized eXpert Intelligence), an assistant that helps users 
-        find information from scientific rheumatology papers. Answer questions based ONLY on the context provided.
-        If the answer cannot be found in the context, say "I don't have enough information to answer that question
-        based on the documents in the database." Do not make up information.
-        Use academic, professional language appropriate for medical research.
-        When referencing information, indicate which document it came from using [Doc X] notation."""
+        # Join the formatted chunks
+        context_text = "\n\n" + "\n\n---\n\n".join(formatted_chunks)
+        
+        # Prepare the system message with improved instructions
+        system_message = """You are ROXI (Rheumatology Optimized eXpert Intelligence), a specialized assistant that helps rheumatologists and researchers find information from scientific papers.
+
+RULES:
+1. Answer questions based ONLY on the context provided.
+2. If the context doesn't contain enough information, say "Based on the available documents, I don't have enough information to fully answer that question." Then share what partial information you do have.
+3. Use academic, professional language appropriate for medical research.
+4. When referencing information, include document numbers like [Document 1], [Document 2], etc.
+5. Be precise with medical terminology. Don't simplify or generalize technical concepts.
+6. For treatments, always specify if the information relates to diagnosis, monitoring, or treatment recommendations.
+7. For medical findings, clearly indicate the strength of evidence if mentioned in the documents.
+8. Do not recall information outside of the provided context, even if you know it to be factually correct.
+
+FORMAT YOUR RESPONSE:
+- Start with a direct answer to the question
+- Follow with detailed explanations from the documents
+- Include document references [Document X] for each key point
+- If the question asks about multiple aspects, organize your response with headings"""
         
         # Create messages for the API call
         messages = [
             {"role": "system", "content": system_message},
-            {"role": "user", "content": f"Here is information from several scientific documents:\n\n{context_text}\n\nBased on the information above, please answer this question: {query}"}
+            {"role": "user", "content": f"Here is information from several scientific rheumatology documents:\n{context_text}\n\nBased only on this information, please answer this question: {query}"}
         ]
         
-        # Make the API call
+        # Make the API call with adjusted parameters for more comprehensive answers
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            temperature=0.2,  # Lower temperature for more factual responses
-            max_tokens=1000   # Limit response length
+            temperature=0.1,  # Lower temperature for even more factual responses
+            max_tokens=1500,  # Allow for longer responses
+            top_p=0.95,       # Slightly more deterministic responses
+            presence_penalty=0.1  # Slight penalty for repeating the same information
         )
         
         # Extract and return the generated answer

@@ -139,8 +139,11 @@ def query():
         conversation_id = f"conv_{uuid.uuid4().hex[:12]}"
     
     try:
-        # Search for similar chunks
-        similar_chunks = search_similar_chunks(query_text, top_k=5)
+        # Search for similar chunks with a lower threshold to increase matches
+        similar_chunks = search_similar_chunks(query_text, top_k=5, similarity_threshold=0.3)
+        
+        # Log the query and number of chunks found
+        logger.info(f"Query: '{query_text}', Found matching chunks: {len(similar_chunks)}")
         
         # Get chunk texts and documents
         citations = []

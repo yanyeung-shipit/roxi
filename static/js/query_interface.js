@@ -9,6 +9,16 @@ function initQueryInterface() {
     const conversationTitle = document.getElementById('conversationTitle');
     const newConversationBtn = document.getElementById('newConversationBtn');
     
+    // Initialize markdown renderer if available
+    const md = window.markdownit ? window.markdownit({
+        html: false,
+        linkify: true,
+        typographer: true,
+        highlight: function (str, lang) {
+            return `<pre><code>${escapeHtml(str)}</code></pre>`;
+        }
+    }) : null;
+    
     if (!queryForm) return;
     
     // Current conversation ID
