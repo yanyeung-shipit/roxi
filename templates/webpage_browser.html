@@ -64,12 +64,7 @@
                     </div>
                     
                     <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label for="collectionFilter" class="form-label mb-0">Collection</label>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="newCollectionBtn">
-                                <i class="fas fa-plus me-1"></i>New Collection
-                            </button>
-                        </div>
+                        <label for="collectionFilter" class="form-label">Collection</label>
                         <select class="form-select" id="collectionFilter">
                             <option value="">All Collections</option>
                             <!-- Collections will be populated here -->
@@ -102,29 +97,9 @@
         <!-- Left Side: Webpage List -->
         <div class="col-md-6">
             <div class="card mb-4">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="batchActionsBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-cog me-1"></i>Batch Actions
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Webpages</h5>
-                    <div class="d-flex align-items-center">
-                        <div class="dropdown me-2">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="batchActionsBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-cog me-1"></i>Batch Actions
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="batchActionsBtn">
-                                <li><a class="dropdown-item" href="#" id="batchMoveBtn">Move to Collection</a></li>
-                            </ul>
-                        </div>
-                        <span class="badge bg-primary" id="webpageCount">0</span>
-                    </div>
-                </div>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="batchActionsBtn">
-                                <li><a class="dropdown-item" href="#" id="batchMoveBtn">Move to Collection</a></li>
-                            </ul>
-                        </div>
-                        <span class="badge bg-primary" id="webpageCount">0</span>
-                    </div>
+                    <span class="badge bg-primary" id="webpageCount">0</span>
                 </div>
                 <div class="card-body p-0">
                     <ul class="list-group list-group-flush" id="webpageList">
@@ -229,92 +204,3 @@
     });
 </script>
 {% endblock %}
-<!-- New Collection Modal -->
-<div class="modal fade" id="newCollectionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Create New Collection</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="newCollectionForm">
-                    <div class="mb-3">
-                        <label for="collectionName" class="form-label">Collection Name</label>
-                        <input type="text" class="form-control" id="collectionName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="collectionDescription" class="form-label">Description (optional)</label>
-                        <textarea class="form-control" id="collectionDescription" rows="3"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="parentCollection" class="form-label">Parent Collection (optional)</label>
-                        <select class="form-select" id="parentCollection">
-                            <option value="">None</option>
-                            <!-- Collections will be populated here -->
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="createCollectionBtn">Create Collection</button>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="toastContainer" class="position-fixed bottom-0 end-0 p-3 toast-container"></div>
-
-<!-- Change Collection Modal -->
-<div class="modal fade" id="changeCollectionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Change Collection</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="changeCollectionForm">
-                    <div class="mb-3">
-                        <label for="changeCollectionSelect" class="form-label">Collection</label>
-                        <select class="form-select" id="changeCollectionSelect">
-                            <option value="">None</option>
-                            <!-- Collections will be populated here -->
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirmChangeCollectionBtn">Save</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Batch Move Modal -->
-<div class="modal fade" id="batchMoveModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Move Webpages to Collection</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="batchMoveForm">
-                    <div class="mb-3">
-                        <label for="batchMoveCollectionSelect" class="form-label">Collection</label>
-                        <select class="form-select" id="batchMoveCollectionSelect">
-                            <option value="">None</option>
-                            <!-- Collections will be populated here -->
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirmBatchMoveBtn">Move</button>
-            </div>
-        </div>
-    </div>
-</div>

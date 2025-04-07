@@ -264,23 +264,3 @@
     margin-left: 0;
     font-style: italic;
 }
-
-/* Collection badge styling */
-.collection-badge {
-    font-size: 0.75rem;
-    font-weight: normal;
-    padding: 0.25rem 0.5rem;
-}
-/* Webpage checkbox styles */
-.webpage-list-item {
-    position: relative;
-}
-
-.webpage-list-item .webpage-checkbox {
-    margin-right: 10px;
-}
-
-/* Toast container styles */
-.toast-container {
-    z-index: 1050;
-}
