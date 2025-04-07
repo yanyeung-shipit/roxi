@@ -1112,7 +1112,12 @@ function initDocumentBrowser() {
                     <div class="detail-label">DOI</div>
                     <div class="detail-value">
                         ${doc.doi 
-                            ? `<a href="https://doi.org/${doc.doi}" target="_blank">${doc.doi}</a>` 
+                            ? `<div>
+                                <a href="https://doi.org/${doc.doi}" target="_blank">${doc.doi}</a>
+                                <button id="updateFromDoiBtn" class="btn btn-sm btn-secondary ms-2" data-id="${doc.id}" title="Update metadata from DOI">
+                                    <i class="fas fa-sync-alt"></i> Update Metadata
+                                </button>
+                               </div>` 
                             : 'Not available'}
                     </div>
                 </div>
@@ -1571,3 +1576,75 @@ function debounce(func, wait) {
         }, wait);
     };
 }
+
+    /**
+     * Handle document metadata updates from DOI
+     */
+    function setupDoiUpdateListener() {
+        // Use event delegation to handle clicks on the Update Metadata button
+        if (documentDetails) {
+            documentDetails.addEventListener('click', function(event) {
+                // Check if the clicked element is the update from DOI button
+                if (event.target.closest('#updateFromDoiBtn')) {
+                    const button = event.target.closest('#updateFromDoiBtn');
+                    const documentId = button.getAttribute('data-id');
+                    
+                    // Disable button and show loading state
+                    button.disabled = true;
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+                    
+                    // Call API to update metadata from DOI
+                    fetch(`/documents/api/documents/${documentId}/update-from-doi`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        button.disabled = false;
+                        button.innerHTML = originalText;
+                        
+                        if (data.success) {
+                            // Show success message
+                            showAlert('Document metadata updated successfully from DOI', 'success');
+                            
+                            // Update document details with the new data
+                            const documentId = parseInt(currentDocumentId);
+                            if (!isNaN(documentId)) {
+                                fetch(`/documents/api/documents/${documentId}`)
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            displayDocumentDetails(data.document);
+                                            // Also update the document in the documents array
+                                            const index = documents.findIndex(doc => doc.id === data.document.id);
+                                            if (index !== -1) {
+                                                documents[index] = data.document;
+                                                renderDocumentList(documents);
+                                            }
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error fetching updated document:', error);
+                                    });
+                            }
+                        } else {
+                            // Show error message
+                            showAlert(`Failed to update metadata: ${data.error}`, 'danger');
+                        }
+                    })
+                    .catch(error => {
+                        button.disabled = false;
+                        button.innerHTML = originalText;
+                        console.error('Error updating metadata from DOI:', error);
+                        showAlert('An error occurred while updating metadata', 'danger');
+                    });
+                }
+            });
+        }
+    }
+    
+    // Call the setup function
+    setupDoiUpdateListener();
