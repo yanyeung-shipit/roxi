@@ -52,7 +52,7 @@ def extract_text_from_webpage(url):
         # Extract the content
         result = trafilatura.extract(downloaded, include_comments=False, include_tables=True, 
                                    include_links=True, include_images=False, 
-                                   output_format='text')
+                                   output_format='txt')
         
         # Extract metadata using trafilatura
         metadata = trafilatura.extract_metadata(downloaded)
