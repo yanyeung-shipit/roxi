@@ -7,8 +7,6 @@ import logging
 from app import db
 from models import Document, ProcessingQueue, TextChunk, VectorEmbedding, Collection
 from utils.auth import requires_auth
-from utils.pubmed_integration import get_paper_details_by_doi, get_article_citation, doi_to_pmid, generate_tags_from_pubmed
-from utils.citation_generator import generate_apa_citation
 
 # Create blueprint
 document_routes = Blueprint('documents', __name__, url_prefix='/documents')
@@ -944,118 +942,6 @@ def update_document_collection(document_id):
         return jsonify({
             'success': False,
             'error': f"Failed to update document collection: {str(e)}"
-        }), 500
-
-@document_routes.route('/api/documents/<int:document_id>/update-from-doi', methods=['POST'])
-def update_document_from_doi(document_id):
-    """
-    Update document metadata by fetching details from its DOI.
-    This endpoint uses the existing DOI of the document to retrieve metadata from PubMed or other sources.
-    """
-    try:
-        document = Document.query.get(document_id)
-        
-        if not document:
-            return jsonify({
-                'success': False,
-                'error': f'Document with ID {document_id} not found'
-            }), 404
-        
-        # Check if document has a DOI
-        if not document.doi:
-            return jsonify({
-                'success': False,
-                'error': 'Document does not have a DOI. Please add a DOI first.'
-            }), 400
-            
-        # Use the provided DOI in the request body if available, otherwise use the existing one
-        data = request.get_json()
-        doi_to_use = data.get('doi', document.doi) if data else document.doi
-        
-        # Clean the DOI - remove common prefixes
-        if doi_to_use.startswith('doi:'):
-            doi_to_use = doi_to_use[4:].strip()
-        elif doi_to_use.startswith('https://doi.org/'):
-            doi_to_use = doi_to_use[16:].strip()
-        
-        # Get paper details from PubMed or other sources
-        paper_details = get_paper_details_by_doi(doi_to_use)
-        
-        if not paper_details:
-            return jsonify({
-                'success': False,
-                'error': f'Could not retrieve metadata for DOI: {doi_to_use}'
-            }), 404
-        
-        # Update document with the fetched metadata
-        if paper_details.get('title'):
-            document.title = paper_details['title']
-            
-        if paper_details.get('authors'):
-            document.authors = ", ".join(paper_details['authors'])
-            
-        if paper_details.get('journal'):
-            document.journal = paper_details['journal']
-            
-        if paper_details.get('doi'):
-            document.doi = paper_details['doi']
-        else:
-            document.doi = doi_to_use  # Keep the DOI we used for lookup
-            
-        if paper_details.get('publication_date'):
-            try:
-                if 'T' in paper_details['publication_date']:
-                    pub_date = datetime.datetime.fromisoformat(paper_details['publication_date'])
-                else:
-                    pub_date = datetime.datetime.strptime(paper_details['publication_date'], '%Y-%m-%d')
-                document.publication_date = pub_date
-            except (ValueError, TypeError):
-                pass  # Ignore date parsing errors
-        
-        # Generate updated citation
-        citation = get_article_citation(paper_details)
-        if citation:
-            document.citation_apa = citation
-        else:
-            # Fallback to our own citation generator
-            document.citation_apa = generate_apa_citation(document)
-        
-        # Get PMID for the document to update tags
-        pmid = doi_to_pmid(doi_to_use)
-        if pmid:
-            pubmed_tags = generate_tags_from_pubmed(pmid)
-            
-            # Merge with existing tags and remove duplicates
-            existing_tags = document.tags or []
-            all_tags = list(set(existing_tags + pubmed_tags))
-            document.tags = all_tags
-        
-        # Save changes
-        db.session.commit()
-        
-        # Return the updated document
-        return jsonify({
-            'success': True,
-            'message': 'Document metadata updated successfully from DOI',
-            'document': {
-                'id': document.id,
-                'title': document.title,
-                'authors': document.authors,
-                'journal': document.journal,
-                'doi': document.doi,
-                'publication_date': document.publication_date.isoformat() if document.publication_date else None,
-                'citation_apa': document.citation_apa,
-                'tags': document.tags,
-                'collection_id': document.collection_id
-            }
-        })
-    except Exception as e:
-        db.session.rollback()
-        import logging
-        logging.exception(f"Error updating document from DOI: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': f"Failed to update document from DOI: {str(e)}"
         }), 500
 
 @document_routes.route('view/<int:document_id>', methods=['GET'])
