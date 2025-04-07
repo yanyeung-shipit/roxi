@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify, request, Response
 from datetime import datetime, timedelta
 import sqlalchemy as sa
 import os
+import logging
 
 from app import db
 from models import SystemMetrics, ProcessingQueue, Document, TextChunk, VectorEmbedding
@@ -150,15 +151,38 @@ def get_system_stats():
     """
     API endpoint to get overall system statistics
     """
-    # Count documents
-    total_documents = Document.query.count()
-    processed_documents = Document.query.filter_by(processed=True).count()
-    processing_percentage = (processed_documents / total_documents * 100) if total_documents > 0 else 0
-    
-    # Count chunks and embeddings
-    total_chunks = TextChunk.query.count()
-    total_embeddings = VectorEmbedding.query.count()
-    embeddings_percentage = (total_embeddings / total_chunks * 100) if total_chunks > 0 else 0
+    # Use raw SQL queries with error handling for more reliable counts in production
+    try:
+        # Count documents
+        total_documents_result = db.session.execute(sa.text("SELECT COUNT(*) FROM document")).scalar()
+        total_documents = total_documents_result if total_documents_result is not None else 0
+        
+        processed_documents_result = db.session.execute(sa.text("SELECT COUNT(*) FROM document WHERE processed = true")).scalar()
+        processed_documents = processed_documents_result if processed_documents_result is not None else 0
+        
+        processing_percentage = (processed_documents / total_documents * 100) if total_documents > 0 else 0
+        
+        # Count chunks and embeddings
+        total_chunks_result = db.session.execute(sa.text("SELECT COUNT(*) FROM text_chunk")).scalar()
+        total_chunks = total_chunks_result if total_chunks_result is not None else 0
+        
+        total_embeddings_result = db.session.execute(sa.text("SELECT COUNT(*) FROM vector_embedding")).scalar()
+        total_embeddings = total_embeddings_result if total_embeddings_result is not None else 0
+        
+        embeddings_percentage = (total_embeddings / total_chunks * 100) if total_chunks > 0 else 0
+        
+        # Log the counts for debugging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Stats: docs={total_documents}, processed={processed_documents}, chunks={total_chunks}, embeddings={total_embeddings}")
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error getting system stats: {str(e)}")
+        total_documents = Document.query.count()
+        processed_documents = Document.query.filter_by(processed=True).count()
+        processing_percentage = (processed_documents / total_documents * 100) if total_documents > 0 else 0
+        total_chunks = TextChunk.query.count()
+        total_embeddings = VectorEmbedding.query.count()
+        embeddings_percentage = (total_embeddings / total_chunks * 100) if total_chunks > 0 else 0
     
     # Calculate average processing time
     avg_processing_time = None

@@ -30,6 +30,12 @@ app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
+    "pool_timeout": 30,  # Timeout for getting connection from pool
+    "max_overflow": 10,  # Allow up to 10 connections beyond pool_size
+    "pool_size": 5,      # Maximum number of connections in the pool
+    "connect_args": {
+        "connect_timeout": 10  # Connection timeout in seconds
+    }
 }
 app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max upload size

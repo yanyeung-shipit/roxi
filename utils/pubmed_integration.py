@@ -40,13 +40,14 @@ def set_api_key(key: str) -> None:
     global API_KEY
     API_KEY = key
 
-def _make_request(url: str, params: Dict[str, Any]) -> Optional[requests.Response]:
+def _make_request(url: str, params: Dict[str, Any], max_retries: int = 2) -> Optional[requests.Response]:
     """
-    Make a request to the NCBI E-utilities API with rate limiting and timeouts.
+    Make a request to the NCBI E-utilities API with rate limiting, timeouts, and retry logic.
     
     Args:
         url (str): The API endpoint URL
         params (Dict): The query parameters
+        max_retries (int): Maximum number of retries on failure
         
     Returns:
         Optional[requests.Response]: The API response or None if request failed
@@ -59,28 +60,53 @@ def _make_request(url: str, params: Dict[str, Any]) -> Optional[requests.Respons
     params['tool'] = 'ROXI-Rheumatology'
     params['email'] = 'rheum.reviews@gmail.com'
     
-    try:
-        # Add timeouts to prevent hanging requests
-        # Connect timeout of 5 seconds, read timeout of 10 seconds
-        response = requests.get(url, params=params, timeout=(5, 10))
-        response.raise_for_status()
-        
-        # Honor rate limits - sleep for 0.33 seconds (3 requests per second)
-        time.sleep(0.33)
-        
-        return response
-    except requests.exceptions.Timeout:
-        print(f"Timeout occurred while connecting to {url} - server may be busy")
-        return None
-    except requests.exceptions.ConnectionError:
-        print(f"Connection error occurred while connecting to {url} - network may be unavailable")
-        return None
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP error occurred while connecting to {url}: {e}")
-        return None
-    except requests.exceptions.RequestException as e:
-        print(f"Error making request to {url}: {e}")
-        return None
+    for attempt in range(max_retries + 1):
+        try:
+            # Add exponential backoff for retries
+            if attempt > 0:
+                delay = 2 ** attempt
+                print(f"Retry attempt {attempt} for URL {url}, waiting {delay} seconds")
+                time.sleep(delay)
+                
+            # Add timeouts to prevent hanging requests
+            # Connect timeout of 5 seconds, read timeout of 15 seconds for better reliability
+            response = requests.get(url, params=params, timeout=(5, 15))
+            response.raise_for_status()
+            
+            # Honor rate limits - sleep for 0.33 seconds (3 requests per second)
+            time.sleep(0.33)
+            
+            return response
+            
+        except requests.exceptions.Timeout:
+            print(f"Timeout occurred while connecting to {url} - server may be busy")
+            # Continue to next retry unless it's the last attempt
+            if attempt == max_retries:
+                return None
+                
+        except requests.exceptions.ConnectionError:
+            print(f"Connection error occurred while connecting to {url} - network may be unavailable")
+            # Continue to next retry unless it's the last attempt
+            if attempt == max_retries:
+                return None
+                
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP error occurred while connecting to {url}: {e}")
+            # If it's a 4xx client error, don't retry
+            if 400 <= e.response.status_code < 500:
+                return None
+            # For 5xx server errors, retry unless it's the last attempt
+            if attempt == max_retries:
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            print(f"Error making request to {url}: {e}")
+            # Continue to next retry unless it's the last attempt
+            if attempt == max_retries:
+                return None
+                
+    # If we reach here, all retry attempts failed
+    return None
 
 def search_pubmed(query: str, retmax: int = 10) -> List[str]:
     """
@@ -201,7 +227,7 @@ def get_paper_details_by_pmid(pmid: str) -> Optional[Dict[str, Any]]:
         print(f"Error parsing PubMed response for PMID {pmid}: {e}")
         return None
 
-def get_paper_details_by_doi(doi: str, max_retries: int = 2) -> Optional[Dict[str, Any]]:
+def get_paper_details_by_doi(doi: str, max_retries: int = 5) -> Optional[Dict[str, Any]]:
     """
     Get paper details by searching for a DOI in PubMed, with retry logic.
     
@@ -495,7 +521,7 @@ def generate_tags_from_pubmed(pmid: str) -> List[str]:
     
     return matched_tags
 
-def doi_to_pmid(doi: str, max_retries: int = 1) -> Optional[str]:
+def doi_to_pmid(doi: str, max_retries: int = 3) -> Optional[str]:
     """
     Convert a DOI to a PubMed ID (PMID) by searching PubMed, with retry logic.
     
