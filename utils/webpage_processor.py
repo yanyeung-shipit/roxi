@@ -13,6 +13,9 @@ from models import Document, TextChunk, VectorEmbedding, ProcessingQueue
 from utils.pdf_processor import chunk_text, clean_text
 from utils.embeddings import generate_embeddings
 
+# Explicitly import the chunk_text function to avoid UnboundLocalError
+from utils.pdf_processor import chunk_text
+
 # Set up logging
 logger = logging.getLogger(__name__)
 

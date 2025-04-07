@@ -35,6 +35,12 @@ function initDocumentBrowser() {
     const processWebpageButton = document.getElementById('processWebpageButton');
     const webpageStatus = document.getElementById('webpageStatus');
     
+    // Webpage processing elements
+    const webpageUrl = document.getElementById('webpageUrl');
+    const webpageCollection = document.getElementById('webpageCollection');
+    const processWebpageButton = document.getElementById('processWebpageButton');
+    const webpageStatus = document.getElementById('webpageStatus');
+    
     // Modals with null checks
     const editDocumentModal = document.getElementById('editDocumentModal') ? 
         new bootstrap.Modal(document.getElementById('editDocumentModal')) : null;
