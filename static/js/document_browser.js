@@ -1118,7 +1118,12 @@ function initDocumentBrowser() {
                                     <i class="fas fa-sync-alt"></i> Update Metadata
                                 </button>
                                </div>` 
-                            : 'Not available'}
+                            : `<div class="doi-input-group d-flex align-items-center">
+                                <input type="text" id="manualDoiInput" class="form-control form-control-sm" placeholder="Enter DOI (e.g., 10.1136/ard.2023.1234)">
+                                <button id="updateFromManualDoiBtn" class="btn btn-sm btn-secondary ms-2" data-id="${doc.id}" title="Fetch metadata from DOI">
+                                    <i class="fas fa-search"></i> Fetch
+                                </button>
+                               </div>`}
                     </div>
                 </div>
                 
@@ -1648,3 +1653,93 @@ function debounce(func, wait) {
     
     // Call the setup function
     setupDoiUpdateListener();
+
+                // Check if the clicked element is the update from manual DOI button
+                if (event.target.closest('#updateFromManualDoiBtn')) {
+                    const button = event.target.closest('#updateFromManualDoiBtn');
+                    const documentId = button.getAttribute('data-id');
+                    const doiInput = document.getElementById('manualDoiInput');
+                    
+                    if (!doiInput || !doiInput.value.trim()) {
+                        showAlert('Please enter a DOI', 'warning');
+                        return;
+                    }
+                    
+                    const manualDoi = doiInput.value.trim();
+                    
+                    // Disable button and show loading state
+                    button.disabled = true;
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+                    
+                    // Call API to update document with the manually entered DOI
+                    fetch(`/documents/api/documents/${documentId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ doi: manualDoi })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Now call the update-from-doi endpoint to fetch metadata
+                            fetch(`/documents/api/documents/${documentId}/update-from-doi`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                            .then(response => response.json())
+                            .then(updateData => {
+                                button.disabled = false;
+                                button.innerHTML = originalText;
+                                
+                                if (updateData.success) {
+                                    // Show success message
+                                    showAlert('Document metadata updated successfully from DOI', 'success');
+                                    
+                                    // Update document details with the new data
+                                    const documentId = parseInt(currentDocumentId);
+                                    if (!isNaN(documentId)) {
+                                        fetch(`/documents/api/documents/${documentId}`)
+                                            .then(response => response.json())
+                                            .then(data => {
+                                                if (data.success) {
+                                                    displayDocumentDetails(data.document);
+                                                    // Also update the document in the documents array
+                                                    const index = documents.findIndex(doc => doc.id === data.document.id);
+                                                    if (index !== -1) {
+                                                        documents[index] = data.document;
+                                                        renderDocumentList(documents);
+                                                    }
+                                                }
+                                            })
+                                            .catch(error => {
+                                                console.error('Error fetching updated document:', error);
+                                            });
+                                    }
+                                } else {
+                                    // Show error message
+                                    showAlert(`Failed to update metadata: ${updateData.error}`, 'danger');
+                                }
+                            })
+                            .catch(error => {
+                                button.disabled = false;
+                                button.innerHTML = originalText;
+                                console.error('Error updating metadata from DOI:', error);
+                                showAlert('An error occurred while updating metadata from DOI', 'danger');
+                            });
+                        } else {
+                            button.disabled = false;
+                            button.innerHTML = originalText;
+                            showAlert(`Failed to update DOI: ${data.error}`, 'danger');
+                        }
+                    })
+                    .catch(error => {
+                        button.disabled = false;
+                        button.innerHTML = originalText;
+                        console.error('Error updating DOI:', error);
+                        showAlert('An error occurred while updating the DOI', 'danger');
+                    });
+                }
