@@ -33,6 +33,26 @@ class Collection(db.Model):
             current = current.parent
             
         return " / ".join(path)
+        
+        
+class Webpage(db.Model):
+    """Model for storing webpage information"""
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(2048), nullable=False, unique=True) 
+    title = db.Column(db.Text)
+    content = db.Column(db.Text)  # The extracted cleaned content
+    crawl_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    last_updated = db.Column(db.DateTime)
+    processed = db.Column(db.Boolean, default=False)
+    collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'), nullable=True)
+    
+    # Relationships
+    collection = db.relationship('Collection', backref=db.backref('webpages', lazy=True))
+    chunks = db.relationship('TextChunk', backref=db.backref('webpage', lazy=True), 
+                            primaryjoin="and_(TextChunk.document_id==None, TextChunk.webpage_id==Webpage.id)")
+                            
+    def __repr__(self):
+        return f"<Webpage {self.id}: {self.title}>"
 
 class Document(db.Model):
     """Model for storing document information"""
@@ -58,16 +78,22 @@ class Document(db.Model):
 
 
 class TextChunk(db.Model):
-    """Model for storing text chunks from documents"""
+    """Model for storing text chunks from documents or webpages"""
     id = db.Column(db.Integer, primary_key=True)
-    document_id = db.Column(db.Integer, db.ForeignKey('document.id'), nullable=False)
+    document_id = db.Column(db.Integer, db.ForeignKey('document.id'), nullable=True)
+    webpage_id = db.Column(db.Integer, db.ForeignKey('webpage.id'), nullable=True)
     text = db.Column(db.Text, nullable=False)
     page_num = db.Column(db.Integer)
     chunk_index = db.Column(db.Integer)
-    document = db.relationship('Document', backref=db.backref('chunks', lazy=True))
+    document = db.relationship('Document', backref=db.backref('chunks', lazy=True), foreign_keys=[document_id])
     
     def __repr__(self):
-        return f"<TextChunk {self.id}: Document {self.document_id}, Page {self.page_num}>"
+        if self.document_id:
+            return f"<TextChunk {self.id}: Document {self.document_id}, Page {self.page_num}>"
+        elif self.webpage_id:
+            return f"<TextChunk {self.id}: Webpage {self.webpage_id}, Index {self.chunk_index}>"
+        else:
+            return f"<TextChunk {self.id}: Unattached>"
 
 
 class VectorEmbedding(db.Model):
@@ -94,6 +120,21 @@ class ProcessingQueue(db.Model):
     
     def __repr__(self):
         return f"<ProcessingQueue {self.id}: Document {self.document_id}, Status {self.status}>"
+        
+        
+class WebpageProcessingQueue(db.Model):
+    """Model for tracking webpage processing queue"""
+    id = db.Column(db.Integer, primary_key=True)
+    webpage_id = db.Column(db.Integer, db.ForeignKey('webpage.id'), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, processing, completed, failed
+    webpage = db.relationship('Webpage', backref=db.backref('queue_entry', uselist=False))
+    queued_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    error_message = db.Column(db.Text)
+    
+    def __repr__(self):
+        return f"<WebpageProcessingQueue {self.id}: Webpage {self.webpage_id}, Status {self.status}>"
 
 
 class QueryHistory(db.Model):
