@@ -595,7 +595,10 @@ def get_collections():
         
         return jsonify({
             'success': True,
-            'collections': flat_list
+            'collections': flat_list,
+            'total': len(flat_list),
+            'page': 1,
+            'perPage': 100
         })
     except Exception as e:
         import logging
