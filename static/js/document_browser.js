@@ -29,6 +29,12 @@ function initDocumentBrowser() {
     const batchMoveBtn = document.getElementById('batchMoveBtn');
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     
+    // Webpage processing elements
+    const webpageUrl = document.getElementById('webpageUrl');
+    const webpageCollection = document.getElementById('webpageCollection');
+    const processWebpageButton = document.getElementById('processWebpageButton');
+    const webpageStatus = document.getElementById('webpageStatus');
+    
     // Modals with null checks
     const editDocumentModal = document.getElementById('editDocumentModal') ? 
         new bootstrap.Modal(document.getElementById('editDocumentModal')) : null;
@@ -1571,3 +1577,144 @@ function debounce(func, wait) {
         }, wait);
     };
 }
+
+/**
+ * Initialize webpage processing functionality
+ */
+function initWebpageProcessing() {
+    const webpageUrl = document.getElementById('webpageUrl');
+    const webpageCollection = document.getElementById('webpageCollection');
+    const processWebpageButton = document.getElementById('processWebpageButton');
+    const webpageStatus = document.getElementById('webpageStatus');
+    
+    if (!webpageUrl || !processWebpageButton || !webpageStatus) {
+        console.warn('Webpage processing elements not found');
+        return;
+    }
+    
+    // Populate the collections dropdown for webpages
+    fetch('/documents/api/collections')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && webpageCollection) {
+                const collections = data.collections || [];
+                webpageCollection.innerHTML = '<option value="">None</option>';
+                
+                collections.forEach(collection => {
+                    const option = document.createElement('option');
+                    option.value = collection.id;
+                    option.textContent = collection.name;
+                    webpageCollection.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading collections for webpage processing:', error);
+        });
+    
+    // Handle webpage processing button click
+    processWebpageButton.addEventListener('click', function() {
+        const url = webpageUrl.value.trim();
+        if (!url) {
+            showWebpageStatus('error', 'Please enter a valid URL');
+            return;
+        }
+        
+        // Show processing status
+        showWebpageStatus('processing', 'Processing webpage...');
+        
+        // Disable the button while processing
+        processWebpageButton.disabled = true;
+        
+        // Send request to process webpage
+        fetch('/api/webpage/process', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                collection_id: webpageCollection.value || null
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showWebpageStatus('success', 'Webpage processed successfully');
+                
+                // Clear the input field
+                webpageUrl.value = '';
+                
+                // Refresh the document list if needed
+                if (typeof loadDocuments === 'function') {
+                    setTimeout(loadDocuments, 2000);
+                }
+            } else {
+                showWebpageStatus('error', `Error: ${data.error || 'Failed to process webpage'}`);
+            }
+            
+            // Re-enable the button
+            processWebpageButton.disabled = false;
+        })
+        .catch(error => {
+            console.error('Error processing webpage:', error);
+            showWebpageStatus('error', `Error: ${error.message || 'Network error'}`);
+            processWebpageButton.disabled = false;
+        });
+    });
+    
+    /**
+     * Show webpage processing status message
+     * 
+     * @param {string} type - Type of status (success, error, processing)
+     * @param {string} message - Message to display
+     */
+    function showWebpageStatus(type, message) {
+        if (!webpageStatus) return;
+        
+        let icon, alertClass;
+        
+        switch (type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                alertClass = 'alert-success';
+                break;
+            case 'error':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                alertClass = 'alert-danger';
+                break;
+            case 'processing':
+                icon = '<div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>';
+                alertClass = 'alert-info';
+                break;
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                alertClass = 'alert-secondary';
+        }
+        
+        webpageStatus.innerHTML = `
+            <div class="alert ${alertClass} d-flex align-items-center">
+                ${icon}
+                ${message}
+            </div>
+        `;
+        
+        // Auto-hide success and error messages after a delay
+        if (type === 'success' || type === 'error') {
+            setTimeout(() => {
+                webpageStatus.innerHTML = '';
+            }, 5000);
+        }
+    }
+}
+
+// Call the function when the document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the document browser (existing function)
+    if (typeof initDocumentBrowser === 'function') {
+        initDocumentBrowser();
+    }
+    
+    // Initialize webpage processing (new function)
+    initWebpageProcessing();
+});
