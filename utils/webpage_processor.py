@@ -328,13 +328,16 @@ def background_processor():
             processor_running = False
 
 def process_webpage_job(webpage_id):
-    """Add webpage to processing queue"""
-    logger.info(f"Adding webpage {webpage_id} to processing queue")
-    webpage_queue.put(webpage_id)
+    """Add webpage to processing queue or process immediately"""
+    logger.info(f"Processing webpage {webpage_id}")
     
-    # Start the background processor if not already running
-    start_background_processor()
-    return True
+    # Instead of relying on a background thread, process immediately
+    success = process_webpage(webpage_id)
+    
+    if not success:
+        logger.error(f"Failed to process webpage {webpage_id}")
+    
+    return success
 
 def start_background_processor():
     """Start the background webpage processor if not already running"""
