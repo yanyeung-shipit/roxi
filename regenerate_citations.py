@@ -5,6 +5,9 @@ from app import app, db
 from models import Document
 import logging
 import datetime
+import time
+from utils.pubmed_integration import get_paper_details_by_doi, get_article_citation
+from utils.doi_validator import check_doi_exists
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -13,6 +16,7 @@ logger = logging.getLogger(__name__)
 def generate_citation(document):
     """
     Generate an APA style citation for a document (improved version)
+    Uses the PubMed API for more accurate citations when a DOI is available.
     
     Args:
         document: The Document model object containing metadata
@@ -21,6 +25,28 @@ def generate_citation(document):
         str: APA-formatted citation
     """
     try:
+        # First, try to use PubMed API if DOI is available
+        if document.doi and check_doi_exists(document.doi):
+            try:
+                # Clean the DOI
+                doi = document.doi.strip()
+                if doi.startswith('doi:'):
+                    doi = doi[4:].strip()
+                elif doi.startswith('https://doi.org/'):
+                    doi = doi[16:].strip()
+                
+                # Get paper details from PubMed
+                paper_details = get_paper_details_by_doi(doi, max_retries=5)
+                
+                if paper_details:
+                    pubmed_citation = get_article_citation(paper_details)
+                    if pubmed_citation:
+                        logger.info(f"Generated citation from PubMed for DOI {doi}")
+                        return pubmed_citation
+            except Exception as e:
+                logger.warning(f"Error getting citation from PubMed: {str(e)}. Falling back to local generation.")
+        
+        # If PubMed API fails or no DOI, use local generation
         # Extract document metadata - ensure we have values for everything
         authors = document.authors or "Unknown Author"
         title = document.title or "Untitled Document"
@@ -44,7 +70,9 @@ def generate_citation(document):
         
         # Add DOI if available
         if doi:
-            citation += f" https://doi.org/{doi}"
+            # Make sure we don't have duplicate DOIs in the citation
+            if "doi.org" not in citation.lower():
+                citation += f" https://doi.org/{doi}"
         
         return citation
     
@@ -101,6 +129,9 @@ def regenerate_all_citations(force=True):
                 logger.error(f"Error processing document {doc.id}: {str(e)}")
                 error_count += 1
                 continue
+                
+            # Add a small delay between documents to avoid rate limiting
+            time.sleep(0.5)
         
         # Commit all changes if any updates were made
         if updated_count > 0:
