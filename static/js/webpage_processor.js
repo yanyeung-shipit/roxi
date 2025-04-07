@@ -13,7 +13,9 @@ const webpageBrowserState = {
     collectionFilter: '',
     selectedWebpageId: null,
     collections: [],
-    webpages: []
+    webpages: [],
+    selectedWebpageIds: [] // For batch operations
+    selectedWebpageIds: [] // For batch operations
 };
 
 /**
@@ -59,6 +61,18 @@ function setupEventListeners() {
         loadWebpages();
     });
     
+    // New collection button
+    document.getElementById('newCollectionBtn').addEventListener('click', () => {
+        // Populate parent collection dropdown in the modal
+        populateParentCollectionDropdown();
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('newCollectionModal'));
+        modal.show();
+    });
+    
+    // Create collection button
+    document.getElementById('createCollectionBtn').addEventListener('click', createNewCollection);
+    
     // Per page select change
     document.getElementById('perPageSelect').addEventListener('change', (e) => {
         webpageBrowserState.perPage = parseInt(e.target.value);
@@ -70,6 +84,17 @@ function setupEventListeners() {
     document.getElementById('refreshWebpagesBtn').addEventListener('click', loadWebpages);
     
     // Delete webpage button
+    // New collection button
+    document.getElementById("newCollectionBtn").addEventListener("click", () => {
+        // Populate parent collection dropdown in the modal
+        populateParentCollectionDropdown();
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById("newCollectionModal"));
+        modal.show();
+    });
+    
+    // Create collection button
+    document.getElementById("createCollectionBtn").addEventListener("click", createNewCollection);
     document.getElementById('deleteWebpageBtn').addEventListener('click', () => {
         if (webpageBrowserState.selectedWebpageId) {
             showDeleteConfirmation(webpageBrowserState.selectedWebpageId);
@@ -95,6 +120,45 @@ function setupEventListeners() {
         const selectedWebpage = webpageBrowserState.webpages.find(
             wp => wp.id === webpageBrowserState.selectedWebpageId
         );
+
+    // Batch move button
+    document.getElementById('batchMoveBtn').addEventListener('click', () => {
+        if (webpageBrowserState.selectedWebpageIds.length === 0) {
+            showError('Please select at least one webpage to move');
+            return;
+        }
+        
+        // Populate collections dropdown
+        const batchMoveCollectionSelect = document.getElementById('batchMoveCollectionSelect');
+        batchMoveCollectionSelect.innerHTML = '<option value="">None</option>';
+        
+        webpageBrowserState.collections.forEach(collection => {
+            const option = document.createElement('option');
+            option.value = collection.id;
+            option.textContent = collection.name;
+            batchMoveCollectionSelect.appendChild(option);
+        });
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('batchMoveModal'));
+        modal.show();
+    });
+    
+    // Confirm batch move button
+    document.getElementById('confirmBatchMoveBtn').addEventListener('click', () => {
+        const collectionId = document.getElementById('batchMoveCollectionSelect').value;
+        
+        if (webpageBrowserState.selectedWebpageIds.length === 0) {
+            showError('Please select at least one webpage to move');
+            return;
+        }
+        
+        // Call API to move webpages
+        batchMoveWebpages(webpageBrowserState.selectedWebpageIds, collectionId);
+        
+        // Close modal
+        bootstrap.Modal.getInstance(document.getElementById('batchMoveModal')).hide();
+    });
         
         if (selectedWebpage && selectedWebpage.url) {
             window.open(selectedWebpage.url, '_blank');
@@ -218,6 +282,10 @@ async function loadWebpages() {
 /**
  * Render webpages list
  */
+function renderPagination(currentPage, totalPages) {
+/**
+ * Render webpages list
+ */
 function renderWebpages(data) {
     const webpageList = document.getElementById('webpageList');
     
@@ -271,14 +339,23 @@ function renderWebpages(data) {
         const collectionName = webpage.collection_name ? 
             `<span class="badge bg-secondary collection-badge">${escapeHtml(webpage.collection_name)}</span>` : '';
         
+        // Check if item is selected in batch
+        const isChecked = webpageBrowserState.selectedWebpageIds.includes(webpage.id) ? 'checked' : '';
+        
         listItem.innerHTML = `
             <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <h6 class="mb-1">${escapeHtml(webpage.title || 'Untitled Webpage')}</h6>
-                    <p class="mb-1 text-muted small text-truncate">${escapeHtml(webpage.url)}</p>
-                    <div class="small mt-1 d-flex justify-content-between">
-                        <span>Added: ${dateStr}</span>
-                        ${collectionName}
+                <div class="d-flex">
+                    <div class="me-2 align-self-center">
+                        <input type="checkbox" class="webpage-checkbox form-check-input" 
+                               data-webpage-id="${webpage.id}" ${isChecked}>
+                    </div>
+                    <div>
+                        <h6 class="mb-1">${escapeHtml(webpage.title || 'Untitled Webpage')}</h6>
+                        <p class="mb-1 text-muted small text-truncate">${escapeHtml(webpage.url)}</p>
+                        <div class="small mt-1 d-flex justify-content-between">
+                            <span>Added: ${dateStr}</span>
+                            ${collectionName}
+                        </div>
                     </div>
                 </div>
                 <div>
@@ -287,8 +364,8 @@ function renderWebpages(data) {
             </div>
         `;
         
-        // Add click event
-        listItem.addEventListener('click', () => {
+        // Add click event - only to main content, not the checkbox
+        listItem.querySelector('.d-flex > div:nth-child(2)').addEventListener('click', (e) => {
             // Remove active class from all items
             document.querySelectorAll('.webpage-list-item').forEach(item => {
                 item.classList.remove('active');
@@ -302,14 +379,46 @@ function renderWebpages(data) {
             showWebpageDetails(webpage);
         });
         
+        // Add checkbox click event
+        listItem.querySelector('.webpage-checkbox').addEventListener('change', (e) => {
+            e.stopPropagation(); // Prevent triggering the list item click
+            
+            const webpageId = parseInt(e.target.getAttribute('data-webpage-id'));
+            
+            if (e.target.checked) {
+                // Add to selected IDs if not already present
+                if (!webpageBrowserState.selectedWebpageIds.includes(webpageId)) {
+                    webpageBrowserState.selectedWebpageIds.push(webpageId);
+                }
+            } else {
+                // Remove from selected IDs
+                webpageBrowserState.selectedWebpageIds = webpageBrowserState.selectedWebpageIds.filter(id => id !== webpageId);
+            }
+            
+            // Update batch action button state
+            updateBatchActionButtonState();
+        });
+        
         webpageList.appendChild(listItem);
     });
 }
 
 /**
- * Render pagination links
+ * Update the state of batch action buttons based on selection
  */
-function renderPagination(currentPage, totalPages) {
+function updateBatchActionButtonState() {
+    const batchActionsBtn = document.getElementById('batchActionsBtn');
+    
+    if (webpageBrowserState.selectedWebpageIds.length > 0) {
+        batchActionsBtn.classList.remove('btn-outline-secondary');
+        batchActionsBtn.classList.add('btn-primary');
+        batchActionsBtn.innerHTML = `<i class="fas fa-cog me-1"></i>Batch Actions (${webpageBrowserState.selectedWebpageIds.length})`;
+    } else {
+        batchActionsBtn.classList.remove('btn-primary');
+        batchActionsBtn.classList.add('btn-outline-secondary');
+        batchActionsBtn.innerHTML = `<i class="fas fa-cog me-1"></i>Batch Actions`;
+    }
+}
     const pagination = document.getElementById('pagination');
     pagination.innerHTML = '';
     
@@ -404,9 +513,9 @@ function showWebpageDetails(webpage) {
                 statusBadge = '<span class="badge bg-warning">Pending</span>';
                 statusDetails = '<p class="mb-0 text-warning"><i class="fas fa-clock me-2"></i>Waiting to be processed</p>';
                 break;
-            case 'processing':
-                statusBadge = '<span class="badge bg-info">Processing</span>';
-                statusDetails = '<p class="mb-0 text-info"><i class="fas fa-spinner fa-spin me-2"></i>Currently being processed</p>';
+    const collectionName = webpage.collection_name ? 
+        `<div class="d-flex align-items-center"><span class="badge bg-secondary collection-badge me-2">${escapeHtml(webpage.collection_name)}</span><button class="btn btn-sm btn-link p-0" id="changeCollectionBtn" title="Change Collection"><i class="fas fa-edit"></i></button></div>` : 
+        `<div class="d-flex align-items-center"><span class="text-muted me-2">None</span><button class="btn btn-sm btn-link p-0" id="changeCollectionBtn" title="Change Collection"><i class="fas fa-edit"></i></button></div>`;
                 break;
             case 'completed':
                 statusBadge = '<span class="badge bg-success">Completed</span>';
@@ -442,6 +551,10 @@ function showWebpageDetails(webpage) {
             <div>
                 ${statusBadge}
             </div>
+                <div class="mt-2">
+                    <small class="text-muted">Collection:</small>
+                    ${collectionName}
+                </div>
         </div>
         ${statusDetails ? `<div class="p-3 border-bottom">${statusDetails}</div>` : ''}
         <ul class="list-group list-group-flush">
@@ -473,6 +586,13 @@ function clearWebpageDetails() {
     
     // Hide actions
     actionsDiv.classList.add('d-none');
+    // Set up collection change button event listener
+    const changeCollectionBtn = document.getElementById("changeCollectionBtn");
+    if (changeCollectionBtn) {
+        changeCollectionBtn.addEventListener("click", () => {
+            showChangeCollectionModal(webpage.id);
+        });
+    }
     
     // Clear details
     detailsDiv.innerHTML = `
@@ -732,4 +852,328 @@ function escapeHtml(unsafe) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+/**
+ * Populate the parent collection dropdown in the new collection modal
+ */
+function populateParentCollectionDropdown() {
+    const parentCollection = document.getElementById('parentCollection');
+    
+    // Clear existing options except the first one
+    parentCollection.innerHTML = '<option value="">None</option>';
+    
+    // Add collection options
+    webpageBrowserState.collections.forEach(collection => {
+        const option = document.createElement('option');
+        option.value = collection.id;
+        option.textContent = collection.name;
+        parentCollection.appendChild(option);
+    });
+}
+
+/**
+ * Create a new collection
+ */
+async function createNewCollection() {
+    const name = document.getElementById('collectionName').value.trim();
+    const description = document.getElementById('collectionDescription').value.trim();
+    const parentId = document.getElementById('parentCollection').value;
+    
+    if (!name) {
+        showError('Collection name is required');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const button = document.getElementById('createCollectionBtn');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Creating...';
+        button.disabled = true;
+        
+        // Send API request
+        const response = await fetch('/api/collections', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                description: description,
+                parent_id: parentId || null
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Reset button state
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('newCollectionModal'));
+            modal.hide();
+            
+            // Reset form
+            document.getElementById('newCollectionForm').reset();
+            
+            // Reload collections
+            loadCollections();
+            
+            // Show success message
+            showSuccess(data.message || 'Collection created successfully');
+        } else {
+            showError(data.error || 'Failed to create collection');
+        }
+    } catch (error) {
+        console.error('Error creating collection:', error);
+        showError('Failed to create collection. Please try again.');
+        
+        // Reset button state
+        const button = document.getElementById('createCollectionBtn');
+        button.innerHTML = 'Create Collection';
+        button.disabled = false;
+    }
+}
+
+/**
+ * Show a success message
+ */
+function showSuccess(message) {
+    const toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+        // Create toast container if it doesn't exist
+        const container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'position-fixed bottom-0 end-0 p-3 toast-container';
+        document.body.appendChild(container);
+    }
+    
+    const toastId = `toast-${Date.now()}`;
+    const toastHtml = `
+        <div class="toast" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-success text-white">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHtml);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+    toast.show();
+    
+    // Remove toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+
+/**
+ * Show an error message
+ */
+function showError(message) {
+    // Check if we have a modal error element
+    const errorModal = document.getElementById('errorModal');
+    if (errorModal) {
+        document.getElementById('errorMessage').textContent = message;
+        const modal = new bootstrap.Modal(errorModal);
+        modal.show();
+    } else {
+        // Fallback to console error if no error modal is available
+        console.error(message);
+        alert(message);
+    }
+}
+
+/**
+ * Utility function to escape HTML
+ */
+function escapeHtml(html) {
+    const div = document.createElement('div');
+    div.textContent = html;
+    return div.innerHTML;
+}
+
+/**
+ * Utility function to debounce function calls
+ */
+function debounce(func, delay) {
+    let timeout;
+    return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
+// Initialize webpage browser when document is loaded
+document.addEventListener('DOMContentLoaded', initWebpageBrowser);
+/**
+ * Update a webpage's collection
+ */
+async function updateWebpageCollection(webpageId, collectionId) {
+    try {
+        // Send API request
+        const response = await fetch(`/api/webpage/${webpageId}/collection`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                collection_id: collectionId || null
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Reload webpages to reflect the change
+            loadWebpages();
+            showSuccess(data.message || 'Webpage collection updated successfully');
+        } else {
+            showError(data.error || 'Failed to update webpage collection');
+        }
+    } catch (error) {
+        console.error('Error updating webpage collection:', error);
+        showError('Failed to update webpage collection. Please try again.');
+    }
+}
+
+/**
+ * Show the change collection modal
+ */
+function showChangeCollectionModal(webpageId) {
+    // Populate collection dropdown
+    const changeCollectionSelect = document.getElementById('changeCollectionSelect');
+    
+    // Clear existing options except the first one
+    changeCollectionSelect.innerHTML = '<option value="">None</option>';
+    
+    // Add collection options
+    webpageBrowserState.collections.forEach(collection => {
+        const option = document.createElement('option');
+        option.value = collection.id;
+        option.textContent = collection.name;
+        changeCollectionSelect.appendChild(option);
+    });
+    
+    // Set current collection if any
+    const webpage = webpageBrowserState.webpages.find(wp => wp.id === webpageId);
+    if (webpage && webpage.collection_id) {
+        changeCollectionSelect.value = webpage.collection_id;
+    }
+    
+    // Set up confirmation button click handler
+    const confirmBtn = document.getElementById('confirmChangeCollectionBtn');
+    
+    // Remove existing event listeners
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    
+    // Add new event listener
+    newConfirmBtn.addEventListener('click', () => {
+        const collectionId = changeCollectionSelect.value;
+        updateWebpageCollection(webpageId, collectionId);
+        
+        // Hide modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('changeCollectionModal'));
+        modal.hide();
+    });
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('changeCollectionModal'));
+    modal.show();
+}
+
+/**
+ * Move multiple webpages to a collection
+ */
+async function batchMoveWebpages(webpageIds, collectionId) {
+    try {
+        // Show loading message
+        showToast('Moving webpages...', 'info');
+        
+        // Make API request
+        const response = await fetch('/api/webpages/batch-move', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                webpage_ids: webpageIds,
+                collection_id: collectionId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(`Successfully moved ${webpageIds.length} webpages`, 'success');
+            
+            // Clear selected IDs
+            webpageBrowserState.selectedWebpageIds = [];
+            
+            // Reload webpages to update UI
+            loadWebpages();
+        } else {
+            showError(data.message || 'Failed to move webpages');
+        }
+    } catch (error) {
+        console.error('Error moving webpages:', error);
+        showError('Failed to move webpages. Please try again.');
+    }
+}
+
+/**
+ * Show a toast notification
+ */
+function showToast(message, type = 'info') {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast element
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center text-white bg-${type}`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+    
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" 
+                    data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // Add to container
+    toastContainer.appendChild(toastEl);
+    
+    // Initialize and show toast
+    const toast = new bootstrap.Toast(toastEl, {
+        autohide: true,
+        delay: 3000
+    });
+    toast.show();
+    
+    // Remove toast after it's hidden
+    toastEl.addEventListener('hidden.bs.toast', () => {
+        toastEl.remove();
+    });
 }
