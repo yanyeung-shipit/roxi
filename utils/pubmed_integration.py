@@ -42,7 +42,7 @@ def set_api_key(key: str) -> None:
 
 def _make_request(url: str, params: Dict[str, Any]) -> Optional[requests.Response]:
     """
-    Make a request to the NCBI E-utilities API with rate limiting.
+    Make a request to the NCBI E-utilities API with rate limiting and timeouts.
     
     Args:
         url (str): The API endpoint URL
@@ -60,13 +60,24 @@ def _make_request(url: str, params: Dict[str, Any]) -> Optional[requests.Respons
     params['email'] = 'rheum.reviews@gmail.com'
     
     try:
-        response = requests.get(url, params=params)
+        # Add timeouts to prevent hanging requests
+        # Connect timeout of 5 seconds, read timeout of 10 seconds
+        response = requests.get(url, params=params, timeout=(5, 10))
         response.raise_for_status()
         
         # Honor rate limits - sleep for 0.33 seconds (3 requests per second)
         time.sleep(0.33)
         
         return response
+    except requests.exceptions.Timeout:
+        print(f"Timeout occurred while connecting to {url} - server may be busy")
+        return None
+    except requests.exceptions.ConnectionError:
+        print(f"Connection error occurred while connecting to {url} - network may be unavailable")
+        return None
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP error occurred while connecting to {url}: {e}")
+        return None
     except requests.exceptions.RequestException as e:
         print(f"Error making request to {url}: {e}")
         return None
@@ -190,16 +201,21 @@ def get_paper_details_by_pmid(pmid: str) -> Optional[Dict[str, Any]]:
         print(f"Error parsing PubMed response for PMID {pmid}: {e}")
         return None
 
-def get_paper_details_by_doi(doi: str) -> Optional[Dict[str, Any]]:
+def get_paper_details_by_doi(doi: str, max_retries: int = 2) -> Optional[Dict[str, Any]]:
     """
-    Get paper details by searching for a DOI in PubMed.
+    Get paper details by searching for a DOI in PubMed, with retry logic.
     
     Args:
         doi (str): The DOI of the paper
+        max_retries (int): Maximum number of retries on failure
         
     Returns:
         Optional[Dict]: Dictionary containing paper details or None if not found
     """
+    if not doi:
+        print("Warning: Empty DOI provided to get_paper_details_by_doi")
+        return None
+        
     # Clean the DOI
     doi = doi.strip().lower()
     if doi.startswith('doi:'):
@@ -207,30 +223,53 @@ def get_paper_details_by_doi(doi: str) -> Optional[Dict[str, Any]]:
     elif doi.startswith('https://doi.org/'):
         doi = doi[16:].strip()
         
-    # Search for the DOI in PubMed
-    search_url = f"{EUTILS_BASE_URL}/esearch.fcgi"
-    params = {
-        'db': 'pubmed',
-        'term': f"{doi}[DOI]",
-        'retmode': 'json',
-        'retmax': 1
-    }
-    
-    response = _make_request(search_url, params)
-    if not response:
-        return None
-    
-    try:
-        data = response.json()
-        pmids = data.get('esearchresult', {}).get('idlist', [])
-        
-        if not pmids:
-            return None
+    # Retry loop
+    for attempt in range(max_retries + 1):
+        try:
+            # Add exponential backoff delay for retries
+            if attempt > 0:
+                delay = 2 ** attempt
+                print(f"Retry attempt {attempt} for DOI {doi}, waiting {delay} seconds")
+                time.sleep(delay)
             
-        # Get details using the first PMID found
-        return get_paper_details_by_pmid(pmids[0])
-    except (json.JSONDecodeError, KeyError):
-        return None
+            # Search for the DOI in PubMed
+            search_url = f"{EUTILS_BASE_URL}/esearch.fcgi"
+            params = {
+                'db': 'pubmed',
+                'term': f"{doi}[DOI]",
+                'retmode': 'json',
+                'retmax': 1
+            }
+            
+            response = _make_request(search_url, params)
+            if not response:
+                continue  # Try again
+            
+            data = response.json()
+            pmids = data.get('esearchresult', {}).get('idlist', [])
+            
+            if not pmids:
+                print(f"DOI {doi} not found in PubMed")
+                return None
+                
+            # Get details using the first PMID found
+            pmid = pmids[0]
+            paper_details = get_paper_details_by_pmid(pmid)
+            
+            # Successfully got the details
+            if paper_details:
+                return paper_details
+                
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error processing DOI {doi} on attempt {attempt+1}: {e}")
+            # Continue to next retry attempt
+        except Exception as e:
+            print(f"Unexpected error processing DOI {doi}: {e}")
+            return None
+    
+    # If we reach here, all retry attempts failed
+    print(f"Failed to get paper details for DOI {doi} after {max_retries+1} attempts")
+    return None
 
 def get_article_citation(paper_details: Dict[str, Any]) -> str:
     """
@@ -456,46 +495,72 @@ def generate_tags_from_pubmed(pmid: str) -> List[str]:
     
     return matched_tags
 
-def doi_to_pmid(doi: str) -> Optional[str]:
+def doi_to_pmid(doi: str, max_retries: int = 1) -> Optional[str]:
     """
-    Convert a DOI to a PubMed ID (PMID) by searching PubMed.
+    Convert a DOI to a PubMed ID (PMID) by searching PubMed, with retry logic.
     
     Args:
         doi (str): The DOI to look up
+        max_retries (int): Maximum number of retries on failure
         
     Returns:
         Optional[str]: The corresponding PMID or None if not found
     """
+    if not doi:
+        print("Warning: Empty DOI provided to doi_to_pmid")
+        return None
+        
     # Clean the DOI
     doi = doi.strip().lower()
     if doi.startswith('doi:'):
         doi = doi[4:].strip()
     elif doi.startswith('https://doi.org/'):
         doi = doi[16:].strip()
-        
-    # Search for the DOI in PubMed
-    search_url = f"{EUTILS_BASE_URL}/esearch.fcgi"
-    params = {
-        'db': 'pubmed',
-        'term': f"{doi}[DOI]",
-        'retmode': 'json',
-        'retmax': 1
-    }
     
-    response = _make_request(search_url, params)
-    if not response:
-        return None
-    
-    try:
-        data = response.json()
-        pmids = data.get('esearchresult', {}).get('idlist', [])
-        
-        if not pmids:
-            return None
+    # Retry loop    
+    for attempt in range(max_retries + 1):
+        try:
+            # Add exponential backoff delay for retries
+            if attempt > 0:
+                delay = 2 ** attempt
+                print(f"Retry attempt {attempt} for DOI lookup {doi}, waiting {delay} seconds")
+                time.sleep(delay)
+                
+            # Search for the DOI in PubMed
+            search_url = f"{EUTILS_BASE_URL}/esearch.fcgi"
+            params = {
+                'db': 'pubmed',
+                'term': f"{doi}[DOI]",
+                'retmode': 'json',
+                'retmax': 1
+            }
             
-        return pmids[0]
-    except (json.JSONDecodeError, KeyError):
-        return None
+            response = _make_request(search_url, params)
+            if not response:
+                continue  # Try again
+            
+            data = response.json()
+            pmids = data.get('esearchresult', {}).get('idlist', [])
+            
+            if not pmids:
+                print(f"DOI {doi} not found in PubMed (no PMID match)")
+                return None
+                
+            # Successfully got the PMID
+            pmid = pmids[0]
+            print(f"Successfully found PMID {pmid} for DOI {doi}")
+            return pmid
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error processing DOI {doi} on attempt {attempt+1}: {e}")
+            # Continue to next retry attempt
+        except Exception as e:
+            print(f"Unexpected error looking up PMID for DOI {doi}: {e}")
+            return None
+    
+    # If we reach here, all retry attempts failed
+    print(f"Failed to get PMID for DOI {doi} after {max_retries+1} attempts")
+    return None
 
 def pmid_to_pmc_id(pmid: str) -> Optional[str]:
     """

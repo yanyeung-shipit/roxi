@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request, send_from_directory, abort, Response
+from flask import Blueprint, render_template, jsonify, request, send_from_directory, abort, Response, current_app
 import sqlalchemy as sa
 import os
 import shutil
@@ -356,10 +356,19 @@ def delete_document(document_id):
         
         # Delete physical file if exists
         try:
-            upload_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
-            file_path = os.path.join(upload_folder, document.filename)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            # Get upload folder from app config instead of hard-coding the path
+            from flask import current_app
+            upload_folder = current_app.config.get("UPLOAD_FOLDER")
+            
+            if upload_folder and document.filename:
+                file_path = os.path.join(upload_folder, document.filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logging.info(f"Deleted file for document {document_id}: {file_path}")
+                else:
+                    logging.warning(f"File not found for document {document_id}: {file_path}")
+            else:
+                logging.warning(f"Skipping file deletion: upload_folder={upload_folder}, filename={document.filename}")
         except Exception as e:
             # Log but continue with database deletion
             import logging
@@ -500,10 +509,19 @@ def batch_delete_documents():
             
             # Delete physical file if exists
             try:
-                upload_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
-                file_path = os.path.join(upload_folder, document.filename)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                # Get upload folder from app config instead of hard-coding the path
+                from flask import current_app
+                upload_folder = current_app.config.get("UPLOAD_FOLDER")
+                
+                if upload_folder and document.filename:
+                    file_path = os.path.join(upload_folder, document.filename)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        logging.info(f"Deleted file for document {document.id}: {file_path}")
+                    else:
+                        logging.warning(f"File not found for document {document.id}: {file_path}")
+                else:
+                    logging.warning(f"Skipping file deletion: upload_folder={upload_folder}, filename={document.filename}")
             except Exception as e:
                 # Log but continue with database deletion
                 import logging
