@@ -5,8 +5,9 @@ ROXI is an intelligent scientific document processing platform leveraging Retrie
 ## Features
 
 - Advanced PDF document processing with intelligent metadata extraction
+- Webpage crawling and content extraction capabilities
 - Smart tag generation for rheumatology research
-- Hierarchical collection organization for documents
+- Hierarchical collection organization for documents and webpages
 - API integration with PubMed for enhanced metadata
 - Automatic citation generation in APA format
 - Vector search for intelligent query processing
@@ -49,12 +50,15 @@ The following environment variables are required:
 ## Usage
 
 1. Upload PDF documents through the document browser interface
-2. Organize documents into collections as needed
-3. Ask research questions through the main query interface
-4. View document details, edit metadata, and manage tags
+2. Add webpages through the webpage browser interface
+3. Organize documents and webpages into collections as needed
+4. Ask research questions through the main query interface
+5. View document details, edit metadata, and manage tags
 
 ## Recent Updates
 
+- Added webpage crawling and content extraction
+- Fixed database constraint issue for text chunks from webpages
 - Improved document browser interface with bold document titles
 - Author name truncation for better readability
 - Enhanced tag generation specific to rheumatology domain
