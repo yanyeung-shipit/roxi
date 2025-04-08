@@ -1,0 +1,70 @@
+monitoring/queue:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+main.js:194  Error checking queue status: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ main.js:194
+documents/api/collections:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+documents/api/documents?page=1&per_page=25:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+document_browser.js:954  Error loading documents: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:954
+document_browser.js:775  Error loading collections: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:775
+documents/api/collections:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+documents/api/documents?page=1&per_page=25:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+document_browser.js:954  Error loading documents: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:954
+document_browser.js:775  Error loading collections: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:775
+documents/api/documents?page=1&per_page=25:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+documents/api/collections:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+document_browser.js:775  Error loading collections: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:775
+document_browser.js:954  Error loading documents: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:954
+documents/api/collections:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+documents/api/documents?page=1&per_page=25:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+document_browser.js:954  Error loading documents: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:954
+document_browser.js:775  Error loading collections: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:775
+documents/api/documents?page=1&per_page=25:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+documents/api/collections:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
+document_browser.js:775  Error loading collections: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:775
+document_browser.js:954  Error loading documents: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+(anonymous) @ document_browser.js:954
+custom.css:1 
+            
+            
+            Failed to load resource: the server responded with a status of 502 ()
