@@ -9,6 +9,11 @@ services:
         fromDatabase:
           name: roxi-db
           property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: roxi-redis
+          property: connectionString
       - key: SESSION_SECRET
         generateValue: true
       - key: OPENAI_API_KEY
@@ -17,6 +22,33 @@ services:
         value: "3"
       - key: MAX_CONTENT_LENGTH
         value: "52428800"
+
+  - type: worker
+    name: roxi-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.celery worker --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: roxi-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: roxi-redis
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MAX_CONTENT_LENGTH
+        value: "52428800"
+
+  - type: redis
+    name: roxi-redis
+    ipAllowList: []
+    plan: free
 
 databases:
   - name: roxi-db

@@ -6,6 +6,7 @@ import random
 import threading
 import time
 import queue
+from flask import current_app
 from app import db, app
 from models import Document, TextChunk, VectorEmbedding, ProcessingQueue
 from utils.pdf_processor import extract_text_from_pdf, chunk_text, clean_text
@@ -20,7 +21,12 @@ from utils.pubmed_integration import (
     generate_tags_from_pubmed
 )
 
-# Set up logging
+# Set up logging with more detailed format
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 def match_to_predefined_tags(text_content, tag_candidates=None):
@@ -471,18 +477,55 @@ def process_document(document_id):
         queue_entry.status = 'processing'
         queue_entry.started_at = datetime.datetime.utcnow()
         db.session.commit()
+        logger.info(f"Updated queue entry {queue_entry.id} for document {document_id} to processing status")
         
-        # Get the file path
-        upload_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+        # Get the file path using app config
+        try:
+            # Try to get upload folder from app config first
+            with app.app_context():
+                upload_folder = current_app.config.get("UPLOAD_FOLDER")
+                logger.info(f"Using upload folder from app config: {upload_folder}")
+        except Exception as e:
+            # Fallback to the hardcoded path if there's an issue with app context
+            logger.warning(f"Could not get UPLOAD_FOLDER from app config: {str(e)}")
+            upload_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+            logger.info(f"Using fallback upload folder path: {upload_folder}")
+        
+        # Try to find the file in multiple locations
         file_path = os.path.join(upload_folder, document.filename)
+        logger.info(f"Looking for file at: {file_path}")
         
         if not os.path.exists(file_path):
-            raise FileNotFoundError(f"PDF file not found: {file_path}")
+            # Try the temp directory as a fallback
+            logger.warning(f"File not found at primary location: {file_path}")
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            temp_file_path = os.path.join(temp_dir, document.filename)
+            logger.info(f"Checking temp directory: {temp_file_path}")
+            
+            if os.path.exists(temp_file_path):
+                file_path = temp_file_path
+                logger.info(f"Found file in temp directory: {file_path}")
+            else:
+                # If it's still not found, try to look in all subdirectories
+                logger.warning(f"File not found in temp directory either. Searching recursively.")
+                found = False
+                for root, dirs, files in os.walk(upload_folder):
+                    if document.filename in files:
+                        file_path = os.path.join(root, document.filename)
+                        logger.info(f"Found file in subdirectory: {file_path}")
+                        found = True
+                        break
+                
+                if not found:
+                    raise FileNotFoundError(f"PDF file not found in any expected location: {document.filename}")
         
         # Extract text from the PDF
+        logger.info(f"Extracting text from PDF: {file_path}")
         text = extract_text_from_pdf(file_path)
         
         if not text:
+            logger.error(f"Text extraction failed for document: {document_id}")
             raise ValueError("Failed to extract text from PDF")
         
         # Store the full text in the document

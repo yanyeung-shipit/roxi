@@ -1,4 +1,5 @@
 import logging
+import os
 import celery
 from celery.schedules import crontab
 
@@ -11,11 +12,17 @@ def setup_celery(app):
             with app.app_context():
                 return self.run(*args, **kwargs)
 
-    # Configure Celery
+    # Get Redis URL from environment variable or use default
+    redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    
+    # Log Redis configuration
+    logger.info(f"Configuring Celery with broker: {redis_url}")
+    
+    # Configure Celery with Redis URL from environment
     celery_app = celery.Celery(
         app.import_name,
-        backend='rpc://',
-        broker='redis://localhost:6379/0',
+        backend=redis_url,
+        broker=redis_url,
         include=['tasks']
     )
 
@@ -27,6 +34,9 @@ def setup_celery(app):
         task_time_limit=1800,  # 30 minute time limit
         task_soft_time_limit=1500,  # 25 minute soft time limit
         broker_connection_retry_on_startup=True,
+        broker_connection_max_retries=None,  # Keep retrying forever
+        broker_connection_retry=True,
+        broker_pool_limit=None,  # Don't limit connections
     )
 
     # Schedule periodic tasks

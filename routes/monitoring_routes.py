@@ -1,10 +1,13 @@
-from flask import Blueprint, render_template, jsonify, request, Response
+from flask import Blueprint, render_template, jsonify, request, Response, current_app
 from datetime import datetime, timedelta
 import sqlalchemy as sa
 import os
 import logging
+import redis
+import json
+import tempfile
 
-from app import db
+from app import db, app
 from models import SystemMetrics, ProcessingQueue, Document, TextChunk, VectorEmbedding
 from utils.embeddings import regenerate_all_embeddings
 
@@ -210,6 +213,133 @@ def get_system_stats():
         'avg_processing_time_seconds': avg_processing_time
     })
     
+@monitoring_routes.route('/health-check')
+def health_check():
+    """
+    API endpoint to check the health of the application
+    Verifies database and Redis connectivity, file system access, etc.
+    """
+    status = {
+        'success': True,
+        'timestamp': datetime.utcnow().isoformat(),
+        'components': {}
+    }
+    
+    # Check database connectivity
+    try:
+        result = db.session.execute(sa.text("SELECT 1")).scalar()
+        status['components']['database'] = {
+            'status': 'ok' if result == 1 else 'error',
+            'message': 'Database connection successful'
+        }
+    except Exception as e:
+        status['success'] = False
+        status['components']['database'] = {
+            'status': 'error',
+            'message': f"Database connection failed: {str(e)}"
+        }
+        
+    # Check Redis connectivity
+    try:
+        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        r = redis.from_url(redis_url)
+        test_key = f'roxi_health_check_{datetime.utcnow().timestamp()}'
+        r.set(test_key, 'ok', ex=60)  # expires in 60s
+        redis_value = r.get(test_key)
+        status['components']['redis'] = {
+            'status': 'ok' if redis_value == b'ok' else 'error',
+            'message': f'Redis connection successful at {redis_url}',
+            'url': redis_url
+        }
+    except Exception as e:
+        status['success'] = False
+        status['components']['redis'] = {
+            'status': 'error',
+            'message': f"Redis connection failed: {str(e)}",
+            'url': os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        }
+        
+    # Check file system access
+    try:
+        # Try to get upload folder from app config
+        with app.app_context():
+            upload_folder = current_app.config.get("UPLOAD_FOLDER")
+            if not upload_folder:
+                upload_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+        
+        # Check if folder exists and is writable
+        folder_exists = os.path.exists(upload_folder)
+        if not folder_exists:
+            try:
+                os.makedirs(upload_folder, exist_ok=True)
+                folder_exists = True
+            except Exception as mkdir_err:
+                status['components']['filesystem'] = {
+                    'status': 'error',
+                    'message': f"Cannot create upload folder: {str(mkdir_err)}",
+                    'path': upload_folder
+                }
+                status['success'] = False
+        
+        if folder_exists:
+            # Try to write a temporary file
+            test_file_path = os.path.join(upload_folder, ".health_check_test")
+            with open(test_file_path, 'w') as f:
+                f.write("test")
+            os.remove(test_file_path)
+            status['components']['filesystem'] = {
+                'status': 'ok',
+                'message': 'File system access successful',
+                'path': upload_folder
+            }
+    except Exception as e:
+        status['success'] = False
+        status['components']['filesystem'] = {
+            'status': 'error',
+            'message': f"File system access failed: {str(e)}",
+            'path': upload_folder if 'upload_folder' in locals() else 'unknown'
+        }
+        
+    # Check temp directory access
+    try:
+        temp_dir = tempfile.gettempdir()
+        test_file_path = os.path.join(temp_dir, ".roxi_health_check_test")
+        with open(test_file_path, 'w') as f:
+            f.write("test")
+        os.remove(test_file_path)
+        status['components']['temp_directory'] = {
+            'status': 'ok',
+            'message': 'Temp directory access successful',
+            'path': temp_dir
+        }
+    except Exception as e:
+        status['success'] = False
+        status['components']['temp_directory'] = {
+            'status': 'error',
+            'message': f"Temp directory access failed: {str(e)}",
+            'path': tempfile.gettempdir() if 'tempfile' in globals() else 'unknown'
+        }
+        
+    # Check system metrics
+    try:
+        import platform
+        import psutil
+        status['components']['system'] = {
+            'status': 'ok',
+            'message': 'System metrics available',
+            'platform': platform.platform(),
+            'python_version': platform.python_version(),
+            'cpu_count': psutil.cpu_count(),
+            'memory_percent': psutil.virtual_memory().percent
+        }
+    except Exception as e:
+        status['components']['system'] = {
+            'status': 'warning',
+            'message': f"System metrics unavailable: {str(e)}"
+        }
+        
+    return jsonify(status)
+
 @monitoring_routes.route('/regenerate-embeddings', methods=['POST'])
 def regenerate_embeddings():
     """
