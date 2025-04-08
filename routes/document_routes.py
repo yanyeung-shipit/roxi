@@ -358,15 +358,42 @@ def delete_document(document_id):
         try:
             # Get upload folder from app config instead of hard-coding the path
             from flask import current_app
+            import logging
+            
             upload_folder = current_app.config.get("UPLOAD_FOLDER")
             
             if upload_folder and document.filename:
                 file_path = os.path.join(upload_folder, document.filename)
+                logging.info(f"Attempting to delete file at: {file_path}")
+                
                 if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logging.info(f"Deleted file for document {document_id}: {file_path}")
+                    try:
+                        os.remove(file_path)
+                        logging.info(f"Deleted file for document {document_id}: {file_path}")
+                    except (IOError, PermissionError) as perm_err:
+                        logging.warning(f"Permission error deleting file: {str(perm_err)}")
+                        # Try to make file writable first
+                        try:
+                            import stat
+                            current_stat = os.stat(file_path).st_mode
+                            os.chmod(file_path, current_stat | stat.S_IWUSR)
+                            os.remove(file_path)
+                            logging.info(f"Successfully deleted file after changing permissions: {file_path}")
+                        except Exception as chmod_err:
+                            logging.warning(f"Failed to change permissions and delete: {str(chmod_err)}")
                 else:
                     logging.warning(f"File not found for document {document_id}: {file_path}")
+                    
+                # Also check temp directory as a fallback if the file wasn't found
+                try:
+                    import tempfile
+                    temp_dir = tempfile.gettempdir()
+                    temp_file_path = os.path.join(temp_dir, document.filename)
+                    if os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
+                        logging.info(f"Deleted file from temp directory: {temp_file_path}")
+                except Exception as temp_err:
+                    logging.warning(f"Error checking temp directory: {str(temp_err)}")
             else:
                 logging.warning(f"Skipping file deletion: upload_folder={upload_folder}, filename={document.filename}")
         except Exception as e:
@@ -511,15 +538,42 @@ def batch_delete_documents():
             try:
                 # Get upload folder from app config instead of hard-coding the path
                 from flask import current_app
+                import logging
+                
                 upload_folder = current_app.config.get("UPLOAD_FOLDER")
                 
                 if upload_folder and document.filename:
                     file_path = os.path.join(upload_folder, document.filename)
+                    logging.info(f"Attempting to delete file at: {file_path}")
+                    
                     if os.path.exists(file_path):
-                        os.remove(file_path)
-                        logging.info(f"Deleted file for document {document.id}: {file_path}")
+                        try:
+                            os.remove(file_path)
+                            logging.info(f"Deleted file for document {document.id}: {file_path}")
+                        except (IOError, PermissionError) as perm_err:
+                            logging.warning(f"Permission error deleting file: {str(perm_err)}")
+                            # Try to make file writable first
+                            try:
+                                import stat
+                                current_stat = os.stat(file_path).st_mode
+                                os.chmod(file_path, current_stat | stat.S_IWUSR)
+                                os.remove(file_path)
+                                logging.info(f"Successfully deleted file after changing permissions: {file_path}")
+                            except Exception as chmod_err:
+                                logging.warning(f"Failed to change permissions and delete: {str(chmod_err)}")
                     else:
                         logging.warning(f"File not found for document {document.id}: {file_path}")
+                        
+                    # Also check temp directory as a fallback if the file wasn't found
+                    try:
+                        import tempfile
+                        temp_dir = tempfile.gettempdir()
+                        temp_file_path = os.path.join(temp_dir, document.filename)
+                        if os.path.exists(temp_file_path):
+                            os.remove(temp_file_path)
+                            logging.info(f"Deleted file from temp directory: {temp_file_path}")
+                    except Exception as temp_err:
+                        logging.warning(f"Error checking temp directory: {str(temp_err)}")
                 else:
                     logging.warning(f"Skipping file deletion: upload_folder={upload_folder}, filename={document.filename}")
             except Exception as e:

@@ -98,13 +98,23 @@ def upload_documents():
             db.session.commit()
             
             # Start background processing
-            process_document_job(document.id)
+            try:
+                process_document_job(document.id)
+            except Exception as job_error:
+                logger.exception(f"Error queuing document for processing: {str(job_error)}")
+                # Continue with upload even if background processing fails
+                errors.append(f'Warning: Document uploaded but processing may be delayed: {str(job_error)}')
             
             success_count += 1
             
         except Exception as e:
             logger.exception(f"Error processing file {file.filename}")
-            errors.append(f'Error processing {file.filename}: {str(e)}')
+            detailed_error = f"Error processing {file.filename}: {str(e)}"
+            # Add more context for debugging in production
+            import traceback
+            logger.error(f"Detailed traceback: {traceback.format_exc()}")
+            
+            errors.append(detailed_error)
             db.session.rollback()
     
     if success_count > 0:

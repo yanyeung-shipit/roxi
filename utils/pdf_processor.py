@@ -108,13 +108,47 @@ def save_uploaded_pdf(uploaded_file, filename=None):
     Returns:
         str: Path to the saved PDF file
     """
-    if filename is None:
-        filename = secure_filename(uploaded_file.filename)
-    
-    upload_folder = current_app.config["UPLOAD_FOLDER"]
-    file_path = os.path.join(upload_folder, filename)
-    
-    uploaded_file.save(file_path)
-    logger.info(f"PDF saved to: {file_path}")
-    
-    return file_path
+    try:
+        if filename is None:
+            filename = secure_filename(uploaded_file.filename)
+        
+        # Get upload folder from config, or use a fallback
+        upload_folder = current_app.config.get("UPLOAD_FOLDER")
+        if not upload_folder:
+            logger.warning("UPLOAD_FOLDER not configured, using default")
+            upload_folder = os.path.join(os.getcwd(), "uploads")
+            
+        # Ensure upload directory exists
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        file_path = os.path.join(upload_folder, filename)
+        
+        # Check if we have write permissions
+        try:
+            with open(file_path, 'wb') as test_file:
+                pass
+            os.remove(file_path)
+        except (IOError, PermissionError) as e:
+            logger.error(f"File permission error: {str(e)}")
+            # Fallback to a temp directory if we can't write to the configured one
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            logger.info(f"Falling back to temp directory: {temp_dir}")
+            file_path = os.path.join(temp_dir, filename)
+        
+        # Save the file
+        uploaded_file.save(file_path)
+        logger.info(f"PDF saved to: {file_path}")
+        
+        # Verify file exists and has content
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File {file_path} not found after saving")
+        
+        if os.path.getsize(file_path) == 0:
+            raise IOError(f"File {file_path} saved but has zero size")
+        
+        return file_path
+        
+    except Exception as e:
+        logger.exception(f"Error saving PDF file: {str(e)}")
+        raise
