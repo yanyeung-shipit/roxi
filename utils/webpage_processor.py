@@ -60,7 +60,7 @@ def extract_content_with_trafilatura(url):
         downloaded = trafilatura.fetch_url(url)
         if downloaded:
             result = trafilatura.extract(downloaded, include_comments=False, 
-                                     include_tables=True, output_format='txt')
+                                     include_tables=True, output_format='text')
             if result:
                 # Try to extract title
                 soup = BeautifulSoup(downloaded, 'html.parser')
