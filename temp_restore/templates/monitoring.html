@@ -1,0 +1,143 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">System Monitoring</h1>
+            <div>
+                <span class="text-secondary me-2">Last updated: <span id="lastUpdateTime"></span></span>
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+                    <i class="fas fa-upload me-2"></i> Upload Documents
+                </a>
+            </div>
+        </div>
+        <p class="text-muted">Monitor system performance and document processing queue</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- System Resources Section -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">System Resources</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="mb-2">CPU Usage</h6>
+                        <div class="progress mb-1">
+                            <div id="cpuProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted">Current: <span id="currentCPU">0%</span></small>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="mb-2">Memory Usage</h6>
+                        <div class="progress mb-1">
+                            <div id="memoryProgressBar" class="progress-bar bg-info" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted">Current: <span id="currentMemory">0%</span></small>
+                    </div>
+                </div>
+                
+                <canvas id="resourceChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Processing Stats Section -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Processing Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6 class="mb-2">Documents (<span id="totalDocuments">0</span>)</h6>
+                            <div class="progress mb-1">
+                                <div id="processingProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted" id="processingStats">0 of 0 documents processed (0%)</small>
+                        </div>
+                        
+                        <div>
+                            <h6 class="mb-2">Avg. Processing Time</h6>
+                            <p id="avgProcessingTime" class="text-primary fs-5 mb-0">N/A</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h6 class="mb-2">Text Chunks (<span id="totalChunks">0</span>)</h6>
+                        <div class="progress mb-1">
+                            <div id="embeddingsProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted" id="embeddingStats">0 of 0 chunks embedded (0%)</small>
+                    </div>
+                </div>
+                
+                <canvas id="chunksChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Processing Queue Section -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Processing Queue</h5>
+                    <div>
+                        <span class="badge bg-secondary me-2" id="queueTotal">0</span>
+                        <span class="badge bg-warning me-1" id="pendingCount">Pending: 0</span>
+                        <span class="badge bg-primary me-1" id="processingCount">Processing: 0</span>
+                        <span class="badge bg-success me-1" id="completedCount">Completed: 0</span>
+                        <span class="badge bg-danger" id="failedCount">Failed: 0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Document</th>
+                                <th>Status</th>
+                                <th>Queued At</th>
+                                <th>Started At</th>
+                                <th>Completed At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queueTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="ms-2">Loading queue data...</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initMonitoringDashboard();
+    });
+</script>
+{% endblock %}

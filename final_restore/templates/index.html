@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="row justify-content-center mb-4">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-body p-4">
+                <h1 class="card-title text-center mb-5">
+                    <span class="text-primary">R</span>heumatology <span class="text-primary">O</span>ptimized e<span class="text-primary">X</span>pert <span class="text-primary">I</span>ntelligence
+                </h1>
+                
+                <!-- Query Interface Section -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card bg-dark">
+                            <div class="card-body p-4">
+                                <h4 class="card-title mb-3">What would you like to know?</h4>
+                                
+                                <div class="row">
+                                    <!-- Query Input -->
+                                    <div class="col-12 mb-3">
+                                        <form id="queryForm">
+                                            <div class="input-group">
+                                                <input type="text" id="queryInput" class="form-control" placeholder="Ask ROXI">
+                                                <button class="btn btn-primary" type="submit" style="width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    
+                                    <!-- Conversation Container -->
+                                    <div class="col-12">
+                                        <div class="card">
+                                            <div class="card-header d-flex justify-content-between align-items-center">
+                                                <span id="conversationTitle">New Conversation</span>
+                                                <button id="newConversationBtn" class="btn btn-sm btn-outline-secondary">
+                                                    <i class="fas fa-plus-circle me-1"></i> New Question
+                                                </button>
+                                            </div>
+                                            <div id="conversationContainer" class="card-body conversation-container">
+                                                <div id="conversationHistory">
+                                                    <div class="text-center text-muted py-5">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-message-square mb-3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                                        <p style="font-size: smaller;">ROXI can make mistakes</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/query_interface.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initQueryInterface();
+    });
+</script>
+{% endblock %}

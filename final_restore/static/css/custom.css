@@ -1,0 +1,266 @@
+/* Custom styles for ROXI */
+
+/* Document browser layout */
+.document-browser .card {
+    margin-bottom: 1.5rem;
+    height: 100%;
+}
+
+/* Make the document cards and document details sections match in height */
+.document-browser .row {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.document-browser .row > div {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Document cards */
+.document-card {
+    font-size: 14px; /* Decreased from default (16px) by 2 points */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+    margin-bottom: 8px !important;
+    height: auto;
+    min-height: 25px;
+    font-size: 14px; /* Decreased from default (16px) by 2 points */
+}
+
+.document-card .card-body {
+    padding: 8px 12px;
+}
+
+/* Truncate authors to one line with ellipsis */
+.document-authors {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.document-card:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+.document-card.border-primary {
+    border-left-color: var(--bs-primary);
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Multi-select styles */
+.document-card.selected-document {
+    border-left-color: var(--bs-success);
+    background-color: rgba(25, 135, 84, 0.1);
+}
+
+.document-checkbox {
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.multi-select-actions {
+    padding: 10px;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+    background-color: rgba(13, 110, 253, 0.05);
+    border: 1px solid rgba(13, 110, 253, 0.1);
+}
+
+.document-list {
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Make document details scrollable */
+#documentDetails {
+    max-height: 650px;
+    min-height: 600px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.document-status-processed {
+    color: var(--bs-success);
+}
+
+.document-status-pending {
+    color: var(--bs-warning);
+}
+
+/* Tag badges */
+.tag-badge {
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tag-badge:hover {
+    opacity: 0.8;
+}
+
+.tag-badge.active {
+    font-weight: bold;
+}
+
+.tag-list {
+    padding: 0.5rem 0;
+}
+
+/* Citation and metadata */
+.citation-box {
+    padding: 1rem;
+    border-radius: 0.25rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    font-family: monospace;
+    white-space: pre-wrap;
+}
+
+.metadata-list {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    grid-gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.metadata-list dt {
+    font-weight: bold;
+    color: var(--bs-gray-400);
+    align-self: start;
+}
+
+.metadata-list dd {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* Conversation styles */
+.conversation-container {
+    height: 500px;
+    overflow-y: auto;
+}
+
+.chat-message {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+}
+
+.user-message {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-left: 4px solid var(--bs-primary);
+}
+
+.assistant-message {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-left: 4px solid var(--bs-secondary);
+}
+
+.citation-details {
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    background-color: rgba(0, 0, 0, 0.15);
+    margin-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.citation-number {
+    margin-bottom: 0.25rem;
+    color: var(--bs-primary);
+}
+
+.citation-title {
+    font-weight: bold;
+}
+
+.citation-text {
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
+/* File upload area */
+.custom-file-upload {
+    position: relative;
+}
+
+.custom-file-upload input[type="file"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.upload-area {
+    border: 2px dashed var(--bs-gray-600);
+    border-radius: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.1);
+    margin-bottom: 1rem;
+    color: var(--bs-gray-400);
+}
+
+.upload-form.drag-over .upload-area {
+    border-color: var(--bs-primary);
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Footer */
+.footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+}
+
+/* Add support for markdown rendering */
+.assistant-message h1, .assistant-message h2, .assistant-message h3, 
+.assistant-message h4, .assistant-message h5, .assistant-message h6 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.assistant-message h2 {
+    font-size: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.3rem;
+}
+
+.assistant-message h3 {
+    font-size: 1.25rem;
+}
+
+.assistant-message ul, .assistant-message ol {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.assistant-message li {
+    margin-bottom: 0.25rem;
+}
+
+.assistant-message strong {
+    color: var(--bs-primary);
+}
+
+.assistant-message p {
+    margin-bottom: 0.75rem;
+}
+
+.assistant-message blockquote {
+    border-left: 3px solid var(--bs-gray-600);
+    padding-left: 0.75rem;
+    margin-left: 0;
+    font-style: italic;
+}
